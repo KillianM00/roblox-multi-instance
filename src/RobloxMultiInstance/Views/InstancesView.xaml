@@ -53,12 +53,15 @@
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                <Button Content="Focus" Padding="10,4"
+                                <Button Content="Focus" Padding="8,3"
                                         Style="{StaticResource SecondaryButton}"
                                         Command="{Binding FocusCommand}" />
-                                <Button Content="Play Here" Padding="10,4" Margin="6,0,0,0"
+                                <Button Content="Play Here" Padding="8,3" Margin="6,0,0,0"
                                         Command="{Binding DataContext.ActivateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
+                                <Button Content="Kill" Padding="8,3" Margin="6,0,0,0"
+                                        Style="{StaticResource DangerButton}"
+                                        Command="{Binding KillCommand}" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -91,6 +94,8 @@
                         Command="{Binding ArrangeOnDesktopCommand}" />
                 <Button Content="Minimize All" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0"
                         Command="{Binding MinimizeAllCommand}" />
+                <Button Content="Kill All" Style="{StaticResource DangerButton}" Margin="6,0,0,0"
+                        Command="{Binding KillAllCommand}" />
             </StackPanel>
             <Button Grid.Column="1" Content="← Back to Grid"
                     Style="{StaticResource PrimaryButton}"

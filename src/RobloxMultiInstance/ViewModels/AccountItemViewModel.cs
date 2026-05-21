@@ -35,4 +35,21 @@ public partial class AccountItemViewModel : ObservableObject
         OnPropertyChanged(nameof(AvatarUrl));
         OnPropertyChanged(nameof(Initial));
     }
+
+    public bool KillTrackedInstance()
+    {
+        var inst = App.ProcessTracker.FindByAccount(Id);
+        if (inst == null)
+        {
+            Status = "Not running";
+            return false;
+        }
+        if (App.ProcessTracker.KillByPid(inst.Pid))
+        {
+            Status = "Killed";
+            return true;
+        }
+        Status = "Kill failed";
+        return false;
+    }
 }

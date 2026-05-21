@@ -105,30 +105,36 @@
                 <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="100" />
                 <DataGridTextColumn Header="Last used" Binding="{Binding LastUsed}" Width="140" />
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
-                <DataGridTemplateColumn Header="" Width="360">
+                <DataGridTemplateColumn Header="" Width="400">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
                                 <Button Content="Launch"
                                         Style="{StaticResource PrimaryButton}"
-                                        Margin="0,0,4,0" Padding="10,4"
+                                        Margin="0,0,4,0" Padding="8,3"
                                         Command="{Binding DataContext.LaunchOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                                <Button Content="Kill"
+                                        Style="{StaticResource DangerButton}"
+                                        Margin="0,0,4,0" Padding="8,3"
+                                        ToolTip="Kill this account's running Roblox instance (if any)."
+                                        Command="{Binding DataContext.KillOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Follow"
                                         Style="{StaticResource SecondaryButton}"
-                                        Margin="0,0,4,0" Padding="10,4"
+                                        Margin="0,0,4,0" Padding="8,3"
                                         ToolTip="Send other selected accounts into THIS account's current game/server."
                                         Command="{Binding DataContext.FollowLeaderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Edit"
                                         Style="{StaticResource SecondaryButton}"
-                                        Margin="0,0,4,0" Padding="10,4"
+                                        Margin="0,0,4,0" Padding="8,3"
                                         Command="{Binding DataContext.EditAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Delete"
                                         Style="{StaticResource DangerButton}"
-                                        Padding="10,4"
+                                        Padding="8,3"
                                         Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                             </StackPanel>
@@ -149,6 +155,8 @@
                     Command="{Binding RefreshInfoCommand}" />
             <Button Content="Friend a User..." Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding FriendUserCommand}" />
+            <Button Content="Kill All Roblox" Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                    Command="{Binding KillAllCommand}" />
         </StackPanel>
 
         <!-- Status -->

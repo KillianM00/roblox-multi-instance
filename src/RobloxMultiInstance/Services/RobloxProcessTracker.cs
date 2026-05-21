@@ -33,6 +33,33 @@ public class RobloxProcessTracker
     public void Start() { if (!_timer.IsEnabled) _timer.Start(); }
     public void Stop() => _timer.Stop();
 
+    public bool KillByPid(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            p.Kill(entireProcessTree: true);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public int KillAll()
+    {
+        int killed = 0;
+        foreach (var p in Process.GetProcessesByName(ProcessName))
+        {
+            try { p.Kill(entireProcessTree: true); killed++; }
+            catch { }
+            finally { p.Dispose(); }
+        }
+        Refresh();
+        return killed;
+    }
+
     public void BeginLaunchAssociation(Guid accountId)
     {
         lock (_byPid)

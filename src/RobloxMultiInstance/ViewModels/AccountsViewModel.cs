@@ -324,6 +324,30 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void KillOne(AccountItemViewModel? item)
+    {
+        item?.KillTrackedInstance();
+    }
+
+    [RelayCommand]
+    private void KillAll()
+    {
+        var count = App.ProcessTracker.Instances.Count;
+        if (count == 0)
+        {
+            MessageBox.Show("No Roblox instances are running.",
+                "Nothing to kill", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var r = MessageBox.Show($"Kill all {count} running Roblox instance(s)?",
+            "Confirm kill all", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (r != MessageBoxResult.Yes) return;
+        App.ProcessTracker.KillAll();
+        foreach (var a in Accounts)
+            if (a.Status == "Launched") a.Status = "Killed";
+    }
+
+    [RelayCommand]
     private void FriendUser()
     {
         var vm = new FriendUserViewModel(Accounts);

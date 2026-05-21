@@ -100,6 +100,16 @@ public partial class InstancesViewModel : ObservableObject
             if (t.Hwnd != IntPtr.Zero) WindowManager.Minimize(t.Hwnd);
     }
 
+    [RelayCommand]
+    private void KillAll()
+    {
+        if (Tiles.Count == 0) return;
+        var r = MessageBox.Show($"Kill all {Tiles.Count} running Roblox instance(s)?",
+            "Confirm kill all", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (r != MessageBoxResult.Yes) return;
+        App.ProcessTracker.KillAll();
+    }
+
     public void OnPlayAreaReady(FrameworkElement playArea)
     {
         if (ActiveTile == null || !IsPlayMode) return;

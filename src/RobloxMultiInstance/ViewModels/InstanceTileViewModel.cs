@@ -59,4 +59,10 @@ public partial class InstanceTileViewModel : ObservableObject
     {
         if (Hwnd != IntPtr.Zero) WindowManager.Minimize(Hwnd);
     }
+
+    [RelayCommand]
+    private void Kill()
+    {
+        App.ProcessTracker.KillByPid(Pid);
+    }
 }
