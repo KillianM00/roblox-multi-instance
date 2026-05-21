@@ -1,0 +1,42 @@
+# Build output
+bin/
+obj/
+out/
+publish/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
+
+# .NET
+*.swp
+*.swo
+*.pdb
+*.dll.config
+*.exe.config
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test / coverage
+*.coverage
+*.coveragexml
+coverage/
+TestResults/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local secrets / runtime
+*.dat
+*.log
+secrets/
+local/
+RobloxMultiInstance/accounts.dat
