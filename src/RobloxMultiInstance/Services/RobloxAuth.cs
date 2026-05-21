@@ -13,10 +13,15 @@ public class RobloxAuth
     private const string UsernameLookupUrl = "https://users.roblox.com/v1/usernames/users";
     private const string UserInfoByIdUrlTemplate = "https://users.roblox.com/v1/users/{0}";
     private const string FriendRequestUrlTemplate = "https://friends.roblox.com/v1/users/{0}/request-friendship";
+    private const string PresenceUrl = "https://presence.roblox.com/v1/presence/users";
     private const string Referer = "https://www.roblox.com/";
 
     public record UserInfo(long Id, string Name, string DisplayName);
     public record FriendRequestResult(bool Success, string Message);
+    public record PresenceInfo(int Type, long? PlaceId, long? RootPlaceId, string? GameId, string LastLocation)
+    {
+        public bool InGame => Type == 2 && PlaceId.HasValue && PlaceId.Value > 0;
+    }
 
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
@@ -32,6 +37,63 @@ public class RobloxAuth
                 root.GetProperty("id").GetInt64(),
                 root.GetProperty("name").GetString() ?? "",
                 root.GetProperty("displayName").GetString() ?? "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<PresenceInfo?> GetPresenceAsync(string cookie, long userId, CancellationToken ct = default)
+    {
+        if (userId <= 0) return null;
+        using var client = CreateClient(cookie);
+        var payload = JsonSerializer.Serialize(new { userIds = new[] { userId } });
+
+        string? csrf = null;
+        using (var probe = new HttpRequestMessage(HttpMethod.Post, PresenceUrl))
+        {
+            probe.Headers.Referrer = new Uri(Referer);
+            probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+            using var probeResp = await client.SendAsync(probe, ct);
+            if (probeResp.IsSuccessStatusCode)
+            {
+                var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
+                return ParsePresence(jsonOk);
+            }
+            if (probeResp.Headers.TryGetValues("x-csrf-token", out var v))
+                csrf = v.FirstOrDefault();
+        }
+
+        if (string.IsNullOrEmpty(csrf)) return null;
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, PresenceUrl);
+        req.Headers.Referrer = new Uri(Referer);
+        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
+        req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await client.SendAsync(req, ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        return ParsePresence(json);
+    }
+
+    private static PresenceInfo? ParsePresence(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("userPresences", out var arr) || arr.GetArrayLength() == 0)
+                return null;
+            var p = arr[0];
+            int type = p.TryGetProperty("userPresenceType", out var t) ? t.GetInt32() : 0;
+            long? placeId = p.TryGetProperty("placeId", out var pl) && pl.ValueKind == JsonValueKind.Number
+                ? pl.GetInt64() : null;
+            long? rootPlace = p.TryGetProperty("rootPlaceId", out var rp) && rp.ValueKind == JsonValueKind.Number
+                ? rp.GetInt64() : null;
+            string? gameId = p.TryGetProperty("gameId", out var gi) && gi.ValueKind == JsonValueKind.String
+                ? gi.GetString() : null;
+            string loc = p.TryGetProperty("lastLocation", out var ll) ? ll.GetString() ?? "" : "";
+            return new PresenceInfo(type, placeId, rootPlace, gameId, loc);
         }
         catch
         {

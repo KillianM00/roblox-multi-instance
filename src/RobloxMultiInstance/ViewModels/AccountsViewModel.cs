@@ -198,6 +198,79 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task FollowLeaderAsync(AccountItemViewModel? leader)
+    {
+        if (leader == null) return;
+        if (leader.Model.UserId is not > 0)
+        {
+            MessageBox.Show("Validate this account first (Refresh Info) — its user ID is unknown.",
+                "Cannot follow", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        leader.Status = "Checking presence...";
+        leader.IsBusy = true;
+        var presence = await App.RobloxAuth.GetPresenceAsync(leader.Model.Cookie, leader.Model.UserId.Value);
+        leader.IsBusy = false;
+
+        if (presence == null)
+        {
+            leader.Status = "Presence query failed";
+            MessageBox.Show("Couldn't fetch presence for this account. The cookie may be expired.",
+                "Presence failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (!presence.InGame || string.IsNullOrEmpty(presence.GameId))
+        {
+            leader.Status = $"Not in a game (type {presence.Type})";
+            MessageBox.Show(
+                $"{leader.Alias} isn't currently in a game (presence type {presence.Type}).\nLaunch them into a game first, then try Follow again.",
+                "Leader not in-game", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var followers = Accounts.Where(a => a.IsSelected && a.Id != leader.Id).ToArray();
+        if (followers.Length == 0)
+        {
+            MessageBox.Show(
+                "No other accounts selected. Tick the checkbox on at least one other account, then click Follow on the leader.",
+                "Nothing to follow with", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
+        SwitchToInstancesTab();
+
+        leader.Status = $"Leading: {presence.LastLocation}";
+
+        for (int i = 0; i < followers.Length; i++)
+        {
+            var f = followers[i];
+            f.IsBusy = true;
+            f.Status = $"Joining {presence.LastLocation}...";
+            var res = await App.RobloxLauncher.LaunchAsync(
+                f.Model.Cookie,
+                presence.PlaceId,
+                f.Model.Id,
+                jobId: presence.GameId);
+            if (res.Success)
+            {
+                f.Status = "Joined leader's server";
+                f.Model.LastUsedAt = DateTime.UtcNow;
+                App.AccountStore.Upsert(f.Model);
+                f.NotifyModelChanged();
+            }
+            else
+            {
+                f.Status = res.Error ?? "Launch failed";
+            }
+            f.IsBusy = false;
+            if (i < followers.Length - 1 && LaunchDelayMs > 0)
+                await Task.Delay(LaunchDelayMs);
+        }
+    }
+
+    [RelayCommand]
     private async Task LaunchOneAsync(AccountItemViewModel? item)
     {
         if (item == null) return;

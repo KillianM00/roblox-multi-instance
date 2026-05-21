@@ -105,7 +105,7 @@
                 <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="100" />
                 <DataGridTextColumn Header="Last used" Binding="{Binding LastUsed}" Width="140" />
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
-                <DataGridTemplateColumn Header="" Width="260">
+                <DataGridTemplateColumn Header="" Width="360">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
@@ -114,6 +114,12 @@
                                         Style="{StaticResource PrimaryButton}"
                                         Margin="0,0,4,0" Padding="10,4"
                                         Command="{Binding DataContext.LaunchOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                                <Button Content="Follow"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Margin="0,0,4,0" Padding="10,4"
+                                        ToolTip="Send other selected accounts into THIS account's current game/server."
+                                        Command="{Binding DataContext.FollowLeaderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Edit"
                                         Style="{StaticResource SecondaryButton}"
