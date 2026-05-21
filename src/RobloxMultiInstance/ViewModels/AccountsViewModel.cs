@@ -151,15 +151,19 @@ public partial class AccountsViewModel : ObservableObject
     private async Task LaunchSelectedAsync()
     {
         long? placeId = null;
+        string? linkCode = null;
+        string? accessCode = null;
         if (!string.IsNullOrWhiteSpace(GameInput))
         {
-            if (!RobloxLauncher.TryParsePlaceId(GameInput, out var parsed))
+            if (!RobloxLauncher.TryParseGameLink(GameInput, out var parsed) || parsed is null)
             {
-                MessageBox.Show("Couldn't parse that as a Roblox game URL or Place ID. Clear the field to launch without joining a game.",
+                MessageBox.Show("Couldn't parse that as a Roblox game URL, Place ID, or private server link. Clear the field to launch without joining a game.",
                     "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            placeId = parsed;
+            placeId = parsed.PlaceId;
+            linkCode = parsed.PrivateServerLinkCode;
+            accessCode = parsed.PrivateServerAccessCode;
         }
 
         var targets = Accounts.Where(a => a.IsSelected).ToArray();
@@ -178,7 +182,7 @@ public partial class AccountsViewModel : ObservableObject
             var t = targets[i];
             t.IsBusy = true;
             t.Status = "Launching...";
-            var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id);
+            var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id, privateServerLinkCode: linkCode, privateServerAccessCode: accessCode);
             if (res.Success)
             {
                 t.Status = "Launched";
@@ -275,15 +279,19 @@ public partial class AccountsViewModel : ObservableObject
     {
         if (item == null) return;
         long? placeId = null;
+        string? linkCode = null;
+        string? accessCode = null;
         if (!string.IsNullOrWhiteSpace(GameInput))
         {
-            if (!RobloxLauncher.TryParsePlaceId(GameInput, out var parsed))
+            if (!RobloxLauncher.TryParseGameLink(GameInput, out var parsed) || parsed is null)
             {
-                MessageBox.Show("Couldn't parse that as a Roblox game URL or Place ID. Clear the field to launch without joining a game.",
+                MessageBox.Show("Couldn't parse that as a Roblox game URL, Place ID, or private server link. Clear the field to launch without joining a game.",
                     "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            placeId = parsed;
+            placeId = parsed.PlaceId;
+            linkCode = parsed.PrivateServerLinkCode;
+            accessCode = parsed.PrivateServerAccessCode;
         }
 
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
@@ -291,7 +299,7 @@ public partial class AccountsViewModel : ObservableObject
 
         item.IsBusy = true;
         item.Status = "Launching...";
-        var res = await App.RobloxLauncher.LaunchAsync(item.Model.Cookie, placeId, item.Model.Id);
+        var res = await App.RobloxLauncher.LaunchAsync(item.Model.Cookie, placeId, item.Model.Id, privateServerLinkCode: linkCode, privateServerAccessCode: accessCode);
         if (res.Success)
         {
             item.Status = "Launched";
