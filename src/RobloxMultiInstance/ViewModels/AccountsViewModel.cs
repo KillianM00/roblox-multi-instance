@@ -150,10 +150,16 @@ public partial class AccountsViewModel : ObservableObject
     [RelayCommand]
     private async Task LaunchSelectedAsync()
     {
-        if (!RobloxLauncher.TryParsePlaceId(GameInput, out var placeId))
+        long? placeId = null;
+        if (!string.IsNullOrWhiteSpace(GameInput))
         {
-            MessageBox.Show("Enter a valid Roblox game URL or Place ID.", "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            if (!RobloxLauncher.TryParsePlaceId(GameInput, out var parsed))
+            {
+                MessageBox.Show("Couldn't parse that as a Roblox game URL or Place ID. Clear the field to launch without joining a game.",
+                    "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            placeId = parsed;
         }
 
         var targets = Accounts.Where(a => a.IsSelected).ToArray();
@@ -165,6 +171,7 @@ public partial class AccountsViewModel : ObservableObject
         }
 
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
+        SwitchToInstancesTab();
 
         for (int i = 0; i < targets.Length; i++)
         {
@@ -194,13 +201,20 @@ public partial class AccountsViewModel : ObservableObject
     private async Task LaunchOneAsync(AccountItemViewModel? item)
     {
         if (item == null) return;
-        if (!RobloxLauncher.TryParsePlaceId(GameInput, out var placeId))
+        long? placeId = null;
+        if (!string.IsNullOrWhiteSpace(GameInput))
         {
-            MessageBox.Show("Enter a valid Roblox game URL or Place ID.", "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            if (!RobloxLauncher.TryParsePlaceId(GameInput, out var parsed))
+            {
+                MessageBox.Show("Couldn't parse that as a Roblox game URL or Place ID. Clear the field to launch without joining a game.",
+                    "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            placeId = parsed;
         }
 
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
+        SwitchToInstancesTab();
 
         item.IsBusy = true;
         item.Status = "Launching...";
@@ -220,6 +234,14 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void FriendUser()
+    {
+        var vm = new FriendUserViewModel(Accounts);
+        var win = new FriendUserWindow { DataContext = vm, Owner = Application.Current.MainWindow };
+        win.ShowDialog();
+    }
+
+    [RelayCommand]
     private void SelectAll()
     {
         foreach (var a in Accounts) a.IsSelected = true;
@@ -234,4 +256,10 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     public void OnAccountSelectionChanged() => UpdateStatus();
+
+    private static void SwitchToInstancesTab()
+    {
+        if (Application.Current?.MainWindow?.DataContext is MainWindowViewModel mwvm)
+            mwvm.CurrentTab = "Instances";
+    }
 }

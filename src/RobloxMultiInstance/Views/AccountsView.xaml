@@ -46,10 +46,10 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Game" VerticalAlignment="Center" Margin="0,0,10,0"
+                <TextBlock Grid.Column="0" Text="Game (optional)" VerticalAlignment="Center" Margin="0,0,10,0"
                            Foreground="{StaticResource MutedTextBrush}" />
                 <TextBox Grid.Column="1" Text="{Binding GameInput, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Roblox game URL (e.g. https://www.roblox.com/games/920587237/...) or Place ID" />
+                         ToolTip="Optional. Roblox game URL (e.g. https://www.roblox.com/games/920587237/...) or Place ID. Leave blank to launch into a default always-online lobby." />
                 <TextBlock Grid.Column="2" Text="Launch delay (ms)" VerticalAlignment="Center" Margin="14,0,8,0"
                            Foreground="{StaticResource MutedTextBrush}" />
                 <TextBox Grid.Column="3" Width="70" Text="{Binding LaunchDelayMs, UpdateSourceTrigger=PropertyChanged}"
@@ -141,6 +141,8 @@
                     Command="{Binding SelectNoneCommand}" />
             <Button Content="Refresh Info" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                     Command="{Binding RefreshInfoCommand}" />
+            <Button Content="Friend a User..." Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    Command="{Binding FriendUserCommand}" />
         </StackPanel>
 
         <!-- Status -->

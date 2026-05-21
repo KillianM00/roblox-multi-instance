@@ -10,9 +10,13 @@ public class RobloxAuth
     private const string AuthTicketUrl = "https://auth.roblox.com/v1/authentication-ticket/";
     private const string AuthenticatedUserUrl = "https://users.roblox.com/v1/users/authenticated";
     private const string ThumbnailUrlTemplate = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={0}&size=150x150&format=Png&isCircular=true";
+    private const string UsernameLookupUrl = "https://users.roblox.com/v1/usernames/users";
+    private const string UserInfoByIdUrlTemplate = "https://users.roblox.com/v1/users/{0}";
+    private const string FriendRequestUrlTemplate = "https://friends.roblox.com/v1/users/{0}/request-friendship";
     private const string Referer = "https://www.roblox.com/";
 
     public record UserInfo(long Id, string Name, string DisplayName);
+    public record FriendRequestResult(bool Success, string Message);
 
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
@@ -32,6 +36,109 @@ public class RobloxAuth
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<UserInfo?> LookupUserByNameAsync(string username, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(username)) return null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
+            var payload = JsonSerializer.Serialize(new
+            {
+                usernames = new[] { username.Trim() },
+                excludeBannedUsers = false,
+            });
+            using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+            using var resp = await client.PostAsync(UsernameLookupUrl, content, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var data = doc.RootElement.GetProperty("data");
+            if (data.GetArrayLength() == 0) return null;
+            var first = data[0];
+            return new UserInfo(
+                first.GetProperty("id").GetInt64(),
+                first.GetProperty("name").GetString() ?? "",
+                first.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "" : "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<UserInfo?> LookupUserByIdAsync(long userId, CancellationToken ct = default)
+    {
+        if (userId <= 0) return null;
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
+            using var resp = await client.GetAsync(string.Format(UserInfoByIdUrlTemplate, userId), ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            return new UserInfo(
+                root.GetProperty("id").GetInt64(),
+                root.GetProperty("name").GetString() ?? "",
+                root.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "" : "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<FriendRequestResult> SendFriendRequestAsync(string cookie, long targetUserId, CancellationToken ct = default)
+    {
+        if (targetUserId <= 0) return new FriendRequestResult(false, "Invalid target user ID");
+        using var client = CreateClient(cookie);
+        var url = string.Format(FriendRequestUrlTemplate, targetUserId);
+
+        try
+        {
+            // Probe for CSRF
+            using var probe = new HttpRequestMessage(HttpMethod.Post, url);
+            probe.Headers.Referrer = new Uri(Referer);
+            probe.Content = new StringContent("");
+            using var probeResp = await client.SendAsync(probe, ct);
+            if (probeResp.IsSuccessStatusCode)
+                return new FriendRequestResult(true, "Sent");
+
+            if (!probeResp.Headers.TryGetValues("x-csrf-token", out var csrfValues))
+                return new FriendRequestResult(false, $"No CSRF token (HTTP {(int)probeResp.StatusCode})");
+
+            var csrf = csrfValues.FirstOrDefault();
+            if (string.IsNullOrEmpty(csrf))
+                return new FriendRequestResult(false, "Empty CSRF token");
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Headers.Referrer = new Uri(Referer);
+            req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
+            req.Content = new StringContent("");
+            using var resp = await client.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode) return new FriendRequestResult(true, "Sent");
+
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("errors", out var errs) && errs.GetArrayLength() > 0)
+                {
+                    var msg = errs[0].TryGetProperty("message", out var m) ? m.GetString() : null;
+                    return new FriendRequestResult(false, msg ?? $"HTTP {(int)resp.StatusCode}");
+                }
+            }
+            catch { }
+            return new FriendRequestResult(false, $"HTTP {(int)resp.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            return new FriendRequestResult(false, ex.Message);
         }
     }
 
