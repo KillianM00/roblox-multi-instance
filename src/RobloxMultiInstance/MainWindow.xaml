@@ -71,8 +71,8 @@
 
         <!-- Content -->
         <Grid Grid.Row="1" Margin="20">
-            <views:AccountsView Visibility="{Binding CurrentTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Accounts}" />
-            <views:InstancesView Visibility="{Binding CurrentTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Instances}" />
+            <views:AccountsView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Accounts}" />
+            <views:InstancesView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Instances}" />
         </Grid>
     </Grid>
 </Window>

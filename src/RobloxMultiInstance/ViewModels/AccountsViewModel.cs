@@ -47,6 +47,50 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task SignInWithBrowserAsync()
+    {
+        var login = new LoginWindow { Owner = Application.Current.MainWindow };
+        if (login.ShowDialog() != true || string.IsNullOrWhiteSpace(login.CapturedCookie)) return;
+
+        var cookie = login.CapturedCookie!;
+        var info = await App.RobloxAuth.GetUserInfoAsync(cookie);
+        if (info == null)
+        {
+            MessageBox.Show(
+                "Captured a cookie but couldn't verify it with the Roblox API. The account was not added.",
+                "Verification failed",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var avatar = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
+
+        var existing = App.AccountStore.Accounts.FirstOrDefault(a => a.UserId == info.Id);
+        if (existing != null)
+        {
+            existing.Cookie = cookie;
+            existing.Username = info.Name;
+            existing.DisplayName = info.DisplayName;
+            if (avatar != null) existing.AvatarUrl = avatar;
+            App.AccountStore.Upsert(existing);
+        }
+        else
+        {
+            App.AccountStore.Upsert(new Models.Account
+            {
+                Alias = info.Name,
+                Cookie = cookie,
+                Username = info.Name,
+                DisplayName = info.DisplayName,
+                UserId = info.Id,
+                AvatarUrl = avatar,
+            });
+        }
+
+        ReloadAccounts();
+    }
+
+    [RelayCommand]
     private void EditAccount(AccountItemViewModel? item)
     {
         if (item == null) return;

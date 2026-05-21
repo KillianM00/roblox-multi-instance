@@ -27,7 +27,13 @@
                 <TextBlock Text="Add accounts, pick a game, then launch the selected ones."
                            FontSize="11" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0" />
             </StackPanel>
-            <Button Grid.Column="1" Content="+ Add Account" Command="{Binding AddAccountCommand}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Sign in with Browser"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="0,0,8,0"
+                        Command="{Binding SignInWithBrowserCommand}" />
+                <Button Content="+ Add (Paste Cookie)" Command="{Binding AddAccountCommand}" />
+            </StackPanel>
         </Grid>
 
         <!-- Launch target -->
