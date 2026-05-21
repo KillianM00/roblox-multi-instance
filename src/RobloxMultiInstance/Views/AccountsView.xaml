@@ -1,0 +1,146 @@
+<UserControl x:Class="RobloxMultiInstance.Views.AccountsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:RobloxMultiInstance.ViewModels">
+
+    <UserControl.DataContext>
+        <vm:AccountsViewModel />
+    </UserControl.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header row -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Accounts" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="Add accounts, pick a game, then launch the selected ones."
+                           FontSize="11" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="+ Add Account" Command="{Binding AddAccountCommand}" />
+        </Grid>
+
+        <!-- Launch target -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Game" VerticalAlignment="Center" Margin="0,0,10,0"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                <TextBox Grid.Column="1" Text="{Binding GameInput, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Roblox game URL (e.g. https://www.roblox.com/games/920587237/...) or Place ID" />
+                <TextBlock Grid.Column="2" Text="Launch delay (ms)" VerticalAlignment="Center" Margin="14,0,8,0"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                <TextBox Grid.Column="3" Width="70" Text="{Binding LaunchDelayMs, UpdateSourceTrigger=PropertyChanged}"
+                         HorizontalContentAlignment="Right" />
+            </Grid>
+        </Border>
+
+        <!-- Account list -->
+        <DataGrid Grid.Row="2" ItemsSource="{Binding Accounts}" RowHeight="56">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="" Width="36">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      HorizontalAlignment="Center"
+                                      Checked="OnSelectionChanged" Unchecked="OnSelectionChanged" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="" Width="56">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Ellipse Width="36" Height="36"
+                                         Fill="{StaticResource PanelAltBrush}"
+                                         Stroke="{StaticResource BorderBrush}" StrokeThickness="1" />
+                                <TextBlock Text="{Binding Initial}" FontWeight="Bold" FontSize="14"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Foreground="{StaticResource MutedTextBrush}" />
+                                <Ellipse Width="36" Height="36" ClipToBounds="True">
+                                    <Ellipse.Fill>
+                                        <ImageBrush ImageSource="{Binding AvatarUrl, Converter={StaticResource StringToBitmapConverter}}"
+                                                    Stretch="UniformToFill" />
+                                    </Ellipse.Fill>
+                                </Ellipse>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Account" Width="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Alias}" FontWeight="SemiBold" FontSize="13"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Username, StringFormat='@{0}'}"
+                                           FontSize="11" Foreground="{StaticResource MutedTextBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="100" />
+                <DataGridTextColumn Header="Last used" Binding="{Binding LastUsed}" Width="140" />
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
+                <DataGridTemplateColumn Header="" Width="260">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <Button Content="Launch"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,0,4,0" Padding="10,4"
+                                        Command="{Binding DataContext.LaunchOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                                <Button Content="Edit"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Margin="0,0,4,0" Padding="10,4"
+                                        Command="{Binding DataContext.EditAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                                <Button Content="Delete"
+                                        Style="{StaticResource DangerButton}"
+                                        Padding="10,4"
+                                        Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Bulk actions -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+            <Button Content="Launch Selected" Command="{Binding LaunchSelectedCommand}" />
+            <Button Content="Select All" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    Command="{Binding SelectAllCommand}" />
+            <Button Content="Select None" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    Command="{Binding SelectNoneCommand}" />
+            <Button Content="Refresh Info" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    Command="{Binding RefreshInfoCommand}" />
+        </StackPanel>
+
+        <!-- Status -->
+        <Border Grid.Row="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="10,5" Margin="0,10,0,0">
+            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding StatusText}" />
+        </Border>
+    </Grid>
+</UserControl>

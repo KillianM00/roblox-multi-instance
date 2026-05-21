@@ -10,4 +10,5 @@ public class Account
     public long? UserId { get; set; }
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastUsedAt { get; set; }
+    public string? AvatarUrl { get; set; }
 }

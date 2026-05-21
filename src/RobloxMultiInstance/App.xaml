@@ -9,6 +9,14 @@
             <conv:BoolToBrushConverter x:Key="BoolToBrushConverter" />
             <conv:BoolToMutexTextConverter x:Key="BoolToMutexTextConverter" />
             <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+            <conv:IntToVisibilityConverter x:Key="IntToVisibilityConverter" />
+            <conv:IntToInverseVisibilityConverter x:Key="IntToInverseVisibilityConverter" />
+            <conv:StringToBitmapConverter x:Key="StringToBitmapConverter" />
+            <conv:TabSelectedToBrushConverter x:Key="TabSelectedToBrushConverter" />
+            <conv:TabSelectedToForegroundConverter x:Key="TabSelectedToForegroundConverter" />
+            <conv:TabVisibilityConverter x:Key="TabVisibilityConverter" />
 
             <Color x:Key="BgColor">#FF1E1E22</Color>
             <Color x:Key="PanelColor">#FF2A2A2F</Color>

@@ -2,125 +2,77 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:RobloxMultiInstance.ViewModels"
+        xmlns:views="clr-namespace:RobloxMultiInstance.Views"
         Title="Multi Roblox Manager"
-        Width="900" Height="600"
-        MinWidth="720" MinHeight="420"
+        Width="1180" Height="720"
+        MinWidth="900" MinHeight="540"
         WindowStartupLocation="CenterScreen">
 
     <Window.DataContext>
-        <vm:MainViewModel />
+        <vm:MainWindowViewModel />
     </Window.DataContext>
 
-    <Grid Margin="14">
+    <Grid Background="{StaticResource BgBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="Multi Roblox Manager" FontSize="20" FontWeight="SemiBold" />
-                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <Border Background="{Binding MutexHeld, Converter={StaticResource BoolToBrushConverter}}"
-                            CornerRadius="3" Padding="6,2" VerticalAlignment="Center">
-                        <TextBlock Foreground="White" FontSize="11" FontWeight="SemiBold"
-                                   Text="{Binding MutexHeld, Converter={StaticResource BoolToMutexTextConverter}}" />
-                    </Border>
-                    <TextBlock Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Text="Holding ROBLOX_singletonEvent allows multiple Roblox processes." />
-                </StackPanel>
-            </StackPanel>
-            <Button Grid.Column="1" Content="+ Add Account" Command="{Binding AddAccountCommand}" />
-        </Grid>
-
-        <!-- Launch target -->
-        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+        <!-- Top bar -->
+        <Border Grid.Row="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1" Padding="20,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Game" VerticalAlignment="Center" Margin="0,0,10,0"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                <TextBox Grid.Column="1" Text="{Binding GameInput, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Roblox game URL (e.g. https://www.roblox.com/games/920587237/...) or Place ID" />
-                <TextBlock Grid.Column="2" Text="Launch delay (ms)" VerticalAlignment="Center" Margin="14,0,8,0"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                <TextBox Grid.Column="3" Width="70" Text="{Binding LaunchDelayMs, UpdateSourceTrigger=PropertyChanged}"
-                         HorizontalContentAlignment="Right" />
+
+                <!-- Logo / title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="28" Height="28" CornerRadius="6"
+                            Background="{StaticResource AccentBrush}" VerticalAlignment="Center">
+                        <TextBlock Text="R" Foreground="White" FontWeight="Bold" FontSize="16"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Multi Roblox" FontSize="16" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="10,0,0,0" />
+                    <TextBlock Text="Manager" FontSize="16"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               VerticalAlignment="Center" Margin="4,0,0,0" />
+                </StackPanel>
+
+                <!-- Nav tabs -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Button Content="Accounts"
+                            Command="{Binding GoToAccountsCommand}"
+                            Padding="18,7" Margin="0,0,6,0"
+                            Background="{Binding CurrentTab, Converter={StaticResource TabSelectedToBrushConverter}, ConverterParameter=Accounts}"
+                            Foreground="{Binding CurrentTab, Converter={StaticResource TabSelectedToForegroundConverter}, ConverterParameter=Accounts}"
+                            BorderThickness="0" />
+                    <Button Content="Instances"
+                            Command="{Binding GoToInstancesCommand}"
+                            Padding="18,7"
+                            Background="{Binding CurrentTab, Converter={StaticResource TabSelectedToBrushConverter}, ConverterParameter=Instances}"
+                            Foreground="{Binding CurrentTab, Converter={StaticResource TabSelectedToForegroundConverter}, ConverterParameter=Instances}"
+                            BorderThickness="0" />
+                </StackPanel>
+
+                <!-- Mutex pill -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
+                             Fill="{Binding MutexHeld, Converter={StaticResource BoolToBrushConverter}}" />
+                    <TextBlock Text="{Binding MutexHeld, Converter={StaticResource BoolToMutexTextConverter}}"
+                               FontSize="11" FontWeight="SemiBold" Margin="6,0,0,0"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Account list -->
-        <DataGrid Grid.Row="2" ItemsSource="{Binding Accounts}" x:Name="AccountsGrid">
-            <DataGrid.Columns>
-                <DataGridTemplateColumn Header="" Width="36">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
-                                      HorizontalAlignment="Center"
-                                      Checked="OnSelectionChanged" Unchecked="OnSelectionChanged" />
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn Header="Alias" Binding="{Binding Alias}" Width="160" />
-                <DataGridTextColumn Header="Username" Binding="{Binding Username}" Width="160" />
-                <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="100" />
-                <DataGridTextColumn Header="Last used" Binding="{Binding LastUsed}" Width="140" />
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
-                <DataGridTemplateColumn Header="" Width="240">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="Launch"
-                                        Style="{StaticResource PrimaryButton}"
-                                        Margin="0,2,4,2" Padding="10,4"
-                                        Command="{Binding DataContext.LaunchOneCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding}" />
-                                <Button Content="Edit"
-                                        Style="{StaticResource SecondaryButton}"
-                                        Margin="0,2,4,2" Padding="10,4"
-                                        Command="{Binding DataContext.EditAccountCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding}" />
-                                <Button Content="Delete"
-                                        Style="{StaticResource DangerButton}"
-                                        Margin="0,2,0,2" Padding="10,4"
-                                        Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding}" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Bulk actions -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
-            <Button Content="Launch Selected" Command="{Binding LaunchSelectedCommand}" />
-            <Button Content="Select All" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                    Command="{Binding SelectAllCommand}" />
-            <Button Content="Select None" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                    Command="{Binding SelectNoneCommand}" />
-            <Button Content="Refresh Info" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                    Command="{Binding RefreshInfoCommand}" />
-        </StackPanel>
-
-        <!-- Status bar -->
-        <Border Grid.Row="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1" CornerRadius="4" Padding="10,5" Margin="0,12,0,0">
-            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding StatusText}" />
-        </Border>
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="20">
+            <views:AccountsView Visibility="{Binding CurrentTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Accounts}" />
+            <views:InstancesView Visibility="{Binding CurrentTab, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Instances}" />
+        </Grid>
     </Grid>
 </Window>

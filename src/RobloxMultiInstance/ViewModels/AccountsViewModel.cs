@@ -2,24 +2,21 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using RobloxMultiInstance.Models;
 using RobloxMultiInstance.Services;
 using RobloxMultiInstance.Views;
 
 namespace RobloxMultiInstance.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class AccountsViewModel : ObservableObject
 {
     public ObservableCollection<AccountItemViewModel> Accounts { get; } = new();
 
     [ObservableProperty] private string _gameInput = "";
     [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private bool _mutexHeld;
     [ObservableProperty] private int _launchDelayMs = 1500;
 
-    public MainViewModel()
+    public AccountsViewModel()
     {
-        MutexHeld = App.MutexHolder.IsHeld;
         ReloadAccounts();
     }
 
@@ -34,7 +31,7 @@ public partial class MainViewModel : ObservableObject
     private void UpdateStatus()
     {
         var sel = Accounts.Count(a => a.IsSelected);
-        StatusText = $"{Accounts.Count} account{(Accounts.Count == 1 ? "" : "s")} • {sel} selected";
+        StatusText = $"{Accounts.Count} account{(Accounts.Count == 1 ? "" : "s")} · {sel} selected";
     }
 
     [RelayCommand]
@@ -67,10 +64,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (item == null) return;
         var result = MessageBox.Show(
-            $"Delete account \"{item.Alias}\"?",
-            "Confirm delete",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+            $"Delete account \"{item.Alias}\"?", "Confirm delete",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (result != MessageBoxResult.Yes) return;
         App.AccountStore.Remove(item.Id);
         ReloadAccounts();
@@ -94,6 +89,8 @@ public partial class MainViewModel : ObservableObject
                 t.Model.Username = info.Name;
                 t.Model.DisplayName = info.DisplayName;
                 t.Model.UserId = info.Id;
+                var avatar = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
+                if (avatar != null) t.Model.AvatarUrl = avatar;
                 App.AccountStore.Upsert(t.Model);
                 t.Status = "OK";
             }
@@ -118,7 +115,8 @@ public partial class MainViewModel : ObservableObject
         var targets = Accounts.Where(a => a.IsSelected).ToArray();
         if (targets.Length == 0)
         {
-            MessageBox.Show("Select at least one account (checkbox in the first column).", "No accounts selected", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Select at least one account (checkbox in the first column).",
+                "No accounts selected", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -129,7 +127,7 @@ public partial class MainViewModel : ObservableObject
             var t = targets[i];
             t.IsBusy = true;
             t.Status = "Launching...";
-            var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId);
+            var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id);
             if (res.Success)
             {
                 t.Status = "Launched";
@@ -162,7 +160,7 @@ public partial class MainViewModel : ObservableObject
 
         item.IsBusy = true;
         item.Status = "Launching...";
-        var res = await App.RobloxLauncher.LaunchAsync(item.Model.Cookie, placeId);
+        var res = await App.RobloxLauncher.LaunchAsync(item.Model.Cookie, placeId, item.Model.Id);
         if (res.Success)
         {
             item.Status = "Launched";

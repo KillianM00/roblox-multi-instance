@@ -22,6 +22,8 @@ public partial class AccountItemViewModel : ObservableObject
     public string DisplayName => Model.DisplayName ?? "";
     public string UserId => Model.UserId?.ToString() ?? "—";
     public string LastUsed => Model.LastUsedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
+    public string? AvatarUrl => Model.AvatarUrl;
+    public string Initial => string.IsNullOrEmpty(Model.Alias) ? "?" : Model.Alias[..1].ToUpperInvariant();
 
     public void NotifyModelChanged()
     {
@@ -30,5 +32,7 @@ public partial class AccountItemViewModel : ObservableObject
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(UserId));
         OnPropertyChanged(nameof(LastUsed));
+        OnPropertyChanged(nameof(AvatarUrl));
+        OnPropertyChanged(nameof(Initial));
     }
 }

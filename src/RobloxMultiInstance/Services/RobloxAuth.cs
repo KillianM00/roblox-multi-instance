@@ -9,6 +9,7 @@ public class RobloxAuth
 {
     private const string AuthTicketUrl = "https://auth.roblox.com/v1/authentication-ticket/";
     private const string AuthenticatedUserUrl = "https://users.roblox.com/v1/users/authenticated";
+    private const string ThumbnailUrlTemplate = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={0}&size=150x150&format=Png&isCircular=true";
     private const string Referer = "https://www.roblox.com/";
 
     public record UserInfo(long Id, string Name, string DisplayName);
@@ -27,6 +28,30 @@ public class RobloxAuth
                 root.GetProperty("id").GetInt64(),
                 root.GetProperty("name").GetString() ?? "",
                 root.GetProperty("displayName").GetString() ?? "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetAvatarHeadshotUrlAsync(long userId, CancellationToken ct = default)
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
+            var url = string.Format(ThumbnailUrlTemplate, userId);
+            using var resp = await client.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var data = doc.RootElement.GetProperty("data");
+            if (data.GetArrayLength() == 0) return null;
+            var first = data[0];
+            if (first.TryGetProperty("imageUrl", out var img) && img.ValueKind == JsonValueKind.String)
+                return img.GetString();
+            return null;
         }
         catch
         {

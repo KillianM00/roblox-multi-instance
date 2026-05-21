@@ -65,6 +65,9 @@ public partial class AddAccountViewModel : ObservableObject
         var info = await App.RobloxAuth.GetUserInfoAsync(trimmed);
         var alias = string.IsNullOrWhiteSpace(Alias) ? (info?.Name ?? "Account") : Alias.Trim();
 
+        string? avatarUrl = null;
+        if (info != null) avatarUrl = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
+
         if (_existing != null)
         {
             _existing.Alias = alias;
@@ -75,6 +78,7 @@ public partial class AddAccountViewModel : ObservableObject
                 _existing.DisplayName = info.DisplayName;
                 _existing.UserId = info.Id;
             }
+            if (avatarUrl != null) _existing.AvatarUrl = avatarUrl;
             Result = _existing;
         }
         else
@@ -86,6 +90,7 @@ public partial class AddAccountViewModel : ObservableObject
                 Username = info?.Name,
                 DisplayName = info?.DisplayName,
                 UserId = info?.Id,
+                AvatarUrl = avatarUrl,
             };
         }
 

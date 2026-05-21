@@ -7,14 +7,20 @@ namespace RobloxMultiInstance.Services;
 public class RobloxLauncher
 {
     private readonly RobloxAuth _auth;
+    private readonly RobloxProcessTracker _tracker;
 
-    public RobloxLauncher(RobloxAuth auth) { _auth = auth; }
+    public RobloxLauncher(RobloxAuth auth, RobloxProcessTracker tracker)
+    {
+        _auth = auth;
+        _tracker = tracker;
+    }
 
     public record LaunchResult(bool Success, string? Error);
 
-    public async Task<LaunchResult> LaunchAsync(string cookie, long placeId, string? jobId = null, CancellationToken ct = default)
+    public async Task<LaunchResult> LaunchAsync(string cookie, long placeId, Guid? accountId = null, string? jobId = null, CancellationToken ct = default)
     {
         if (placeId <= 0) return new LaunchResult(false, "Place ID required.");
+        if (accountId.HasValue) _tracker.BeginLaunchAssociation(accountId.Value);
 
         var ticket = await _auth.GetAuthTicketAsync(cookie, ct);
         if (string.IsNullOrEmpty(ticket)) return new LaunchResult(false, "Failed to fetch auth ticket — cookie may be invalid or expired.");
