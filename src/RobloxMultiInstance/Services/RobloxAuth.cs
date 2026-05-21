@@ -14,6 +14,7 @@ public class RobloxAuth
     private const string UserInfoByIdUrlTemplate = "https://users.roblox.com/v1/users/{0}";
     private const string FriendRequestUrlTemplate = "https://friends.roblox.com/v1/users/{0}/request-friendship";
     private const string PresenceUrl = "https://presence.roblox.com/v1/presence/users";
+    private const string ResolveShareLinkUrl = "https://apis.roblox.com/sharelinks/v1/resolve-link";
     private const string Referer = "https://www.roblox.com/";
 
     public record UserInfo(long Id, string Name, string DisplayName);
@@ -22,6 +23,7 @@ public class RobloxAuth
     {
         public bool InGame => Type == 2 && PlaceId.HasValue && PlaceId.Value > 0;
     }
+    public record ShareLinkResolution(long PlaceId, string? PrivateServerLinkCode, string LinkType);
 
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
@@ -37,6 +39,73 @@ public class RobloxAuth
                 root.GetProperty("id").GetInt64(),
                 root.GetProperty("name").GetString() ?? "",
                 root.GetProperty("displayName").GetString() ?? "");
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<ShareLinkResolution?> ResolveShareLinkAsync(string cookie, string linkId, string linkType, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(linkId)) return null;
+        using var client = CreateClient(cookie);
+        var payload = JsonSerializer.Serialize(new { linkId, linkType });
+
+        string? csrf = null;
+        using (var probe = new HttpRequestMessage(HttpMethod.Post, ResolveShareLinkUrl))
+        {
+            probe.Headers.Referrer = new Uri(Referer);
+            probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+            using var probeResp = await client.SendAsync(probe, ct);
+            if (probeResp.IsSuccessStatusCode)
+            {
+                var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
+                return ParseShareResolution(jsonOk, linkType);
+            }
+            if (probeResp.Headers.TryGetValues("x-csrf-token", out var v))
+                csrf = v.FirstOrDefault();
+        }
+
+        if (string.IsNullOrEmpty(csrf)) return null;
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, ResolveShareLinkUrl);
+        req.Headers.Referrer = new Uri(Referer);
+        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
+        req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await client.SendAsync(req, ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        var json = await resp.Content.ReadAsStringAsync(ct);
+        return ParseShareResolution(json, linkType);
+    }
+
+    private static ShareLinkResolution? ParseShareResolution(string json, string linkType)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("privateServerInviteData", out var psi) && psi.ValueKind == JsonValueKind.Object)
+            {
+                if (!psi.TryGetProperty("placeId", out var pl) || pl.ValueKind != JsonValueKind.Number) return null;
+                long placeId = pl.GetInt64();
+                string? linkCode = psi.TryGetProperty("linkCode", out var lc) ? lc.GetString() : null;
+                return new ShareLinkResolution(placeId, linkCode, linkType);
+            }
+
+            if (root.TryGetProperty("experienceInviteData", out var exp) && exp.ValueKind == JsonValueKind.Object)
+            {
+                if (!exp.TryGetProperty("placeId", out var pl) || pl.ValueKind != JsonValueKind.Number) return null;
+                return new ShareLinkResolution(pl.GetInt64(), null, linkType);
+            }
+
+            if (root.TryGetProperty("placeId", out var pl2) && pl2.ValueKind == JsonValueKind.Number)
+            {
+                return new ShareLinkResolution(pl2.GetInt64(), null, linkType);
+            }
+
+            return null;
         }
         catch
         {

@@ -147,25 +147,41 @@ public partial class AccountsViewModel : ObservableObject
         }
     }
 
+    private static readonly System.Text.RegularExpressions.Regex ShareLinkRegex = new(
+        @"roblox\.com/share(?:\?|\?.*&)code=([A-Za-z0-9_-]+)(?:.*&type=([A-Za-z]+))?",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private async Task<(long? PlaceId, string? LinkCode, string? AccessCode)?> ResolveGameInputAsync(string cookieForResolution)
+    {
+        if (string.IsNullOrWhiteSpace(GameInput)) return (null, null, null);
+
+        var share = ShareLinkRegex.Match(GameInput);
+        if (share.Success)
+        {
+            var code = share.Groups[1].Value;
+            var type = share.Groups[2].Success && !string.IsNullOrEmpty(share.Groups[2].Value)
+                ? share.Groups[2].Value : "Server";
+            var resolved = await App.RobloxAuth.ResolveShareLinkAsync(cookieForResolution, code, type);
+            if (resolved == null)
+            {
+                MessageBox.Show($"Couldn't resolve the share link (type={type}). It may be expired, revoked, or the resolving account may lack access.",
+                    "Share link resolution failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
+            return (resolved.PlaceId, resolved.PrivateServerLinkCode, null);
+        }
+
+        if (RobloxLauncher.TryParseGameLink(GameInput, out var parsed) && parsed is not null)
+            return (parsed.PlaceId, parsed.PrivateServerLinkCode, parsed.PrivateServerAccessCode);
+
+        MessageBox.Show("Couldn't parse that as a Roblox game URL, Place ID, private server link, or share link.",
+            "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return null;
+    }
+
     [RelayCommand]
     private async Task LaunchSelectedAsync()
     {
-        long? placeId = null;
-        string? linkCode = null;
-        string? accessCode = null;
-        if (!string.IsNullOrWhiteSpace(GameInput))
-        {
-            if (!RobloxLauncher.TryParseGameLink(GameInput, out var parsed) || parsed is null)
-            {
-                MessageBox.Show("Couldn't parse that as a Roblox game URL, Place ID, or private server link. Clear the field to launch without joining a game.",
-                    "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            placeId = parsed.PlaceId;
-            linkCode = parsed.PrivateServerLinkCode;
-            accessCode = parsed.PrivateServerAccessCode;
-        }
-
         var targets = Accounts.Where(a => a.IsSelected).ToArray();
         if (targets.Length == 0)
         {
@@ -173,6 +189,10 @@ public partial class AccountsViewModel : ObservableObject
                 "No accounts selected", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
+        var resolved = await ResolveGameInputAsync(targets[0].Model.Cookie);
+        if (resolved == null) return;
+        var (placeId, linkCode, accessCode) = resolved.Value;
 
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
         SwitchToInstancesTab();
@@ -278,21 +298,10 @@ public partial class AccountsViewModel : ObservableObject
     private async Task LaunchOneAsync(AccountItemViewModel? item)
     {
         if (item == null) return;
-        long? placeId = null;
-        string? linkCode = null;
-        string? accessCode = null;
-        if (!string.IsNullOrWhiteSpace(GameInput))
-        {
-            if (!RobloxLauncher.TryParseGameLink(GameInput, out var parsed) || parsed is null)
-            {
-                MessageBox.Show("Couldn't parse that as a Roblox game URL, Place ID, or private server link. Clear the field to launch without joining a game.",
-                    "Invalid game", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            placeId = parsed.PlaceId;
-            linkCode = parsed.PrivateServerLinkCode;
-            accessCode = parsed.PrivateServerAccessCode;
-        }
+
+        var resolved = await ResolveGameInputAsync(item.Model.Cookie);
+        if (resolved == null) return;
+        var (placeId, linkCode, accessCode) = resolved.Value;
 
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
         SwitchToInstancesTab();
