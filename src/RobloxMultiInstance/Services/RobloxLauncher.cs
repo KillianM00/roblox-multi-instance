@@ -17,7 +17,7 @@ public class RobloxLauncher
         _tracker = tracker;
     }
 
-    public record LaunchResult(bool Success, string? Error);
+    public record LaunchResult(bool Success, string? Error, int? RetryAfterSeconds = null);
 
     public async Task<LaunchResult> LaunchAsync(string cookie, long? placeId = null, Guid? accountId = null, string? jobId = null, string? privateServerLinkCode = null, string? privateServerAccessCode = null, CancellationToken ct = default)
     {
@@ -25,7 +25,7 @@ public class RobloxLauncher
 
         var ticketResult = await _auth.GetAuthTicketAsync(cookie, ct);
         if (string.IsNullOrEmpty(ticketResult.Ticket))
-            return new LaunchResult(false, ticketResult.Error ?? "Failed to fetch auth ticket.");
+            return new LaunchResult(false, ticketResult.Error ?? "Failed to fetch auth ticket.", ticketResult.RetryAfterSeconds);
         var ticket = ticketResult.Ticket;
 
         var unixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();

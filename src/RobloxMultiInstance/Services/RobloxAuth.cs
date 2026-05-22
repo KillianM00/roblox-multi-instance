@@ -27,10 +27,12 @@ public class RobloxAuth
     }
     public record ShareLinkResolution(long PlaceId, string? PrivateServerLinkCode, string LinkType);
 
-    private static readonly HttpClient AuthedClient = BuildClient(TimeSpan.FromSeconds(20), "Roblox/WinInet");
-    private static readonly HttpClient AnonClient = BuildClient(TimeSpan.FromSeconds(10), "RobloxMultiInstance/0.1");
+    private const string BrowserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
-    private static HttpClient BuildClient(TimeSpan timeout, string ua)
+    private static readonly HttpClient AuthedClient = BuildClient(TimeSpan.FromSeconds(20));
+    private static readonly HttpClient AnonClient = BuildClient(TimeSpan.FromSeconds(10));
+
+    private static HttpClient BuildClient(TimeSpan timeout)
     {
         var handler = new SocketsHttpHandler
         {
@@ -40,9 +42,40 @@ public class RobloxAuth
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
         };
-        var c = new HttpClient(handler) { Timeout = timeout };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd(ua);
+        var c = new HttpClient(handler)
+        {
+            Timeout = timeout,
+            DefaultRequestVersion = HttpVersion.Version11,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+        };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(BrowserUA);
+        c.DefaultRequestHeaders.Accept.ParseAdd("application/json, text/plain, */*");
+        c.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua", "\"Chromium\";v=\"130\", \"Google Chrome\";v=\"130\", \"Not?A_Brand\";v=\"99\"");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Mobile", "?0");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Windows\"");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Dest", "empty");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Mode", "cors");
+        c.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Site", "same-site");
         return c;
+    }
+
+    private static void DecorateAuthed(HttpRequestMessage req)
+    {
+        req.Headers.TryAddWithoutValidation("Origin", "https://www.roblox.com");
+        req.Headers.ConnectionClose = true;
+        req.Version = HttpVersion.Version11;
+        req.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+    }
+
+    private static int? ParseRetryAfter(HttpResponseMessage resp)
+    {
+        if (resp.Headers.RetryAfter is { } ra)
+        {
+            if (ra.Delta is { } d) return (int)Math.Ceiling(d.TotalSeconds);
+            if (ra.Date is { } when) return (int)Math.Ceiling((when - DateTimeOffset.UtcNow).TotalSeconds);
+        }
+        return null;
     }
 
     private static HttpRequestMessage AuthedRequest(HttpMethod method, string url, string cookie)
@@ -337,11 +370,12 @@ public class RobloxAuth
         }
     }
 
-    public record TicketResult(string? Ticket, string? Error);
+    public record TicketResult(string? Ticket, string? Error, int? RetryAfterSeconds = null);
 
     private async Task<HttpResponseMessage> SendTicketRequestAsync(string cookie, string csrf, CancellationToken ct)
     {
         var req = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
+        DecorateAuthed(req);
         req.Headers.Referrer = new Uri(Referer);
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
@@ -357,7 +391,7 @@ public class RobloxAuth
         {
             using var resp = await SendTicketRequestAsync(cookie, cached, ct);
             if ((int)resp.StatusCode == 429)
-                return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");
+                return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.", ParseRetryAfter(resp));
             if (resp.IsSuccessStatusCode && resp.Headers.TryGetValues("rbx-authentication-ticket", out var tv))
             {
                 var t = tv.FirstOrDefault();

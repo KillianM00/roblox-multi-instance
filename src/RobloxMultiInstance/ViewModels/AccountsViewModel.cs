@@ -225,9 +225,11 @@ public partial class AccountsViewModel : ObservableObject
 
                 if (i < targets.Length - 1)
                 {
-                    int wait = hit429 ? RateLimitBackoffMs : LaunchDelayMs;
+                    int wait = hit429
+                        ? Math.Max(RateLimitBackoffMs, (res.RetryAfterSeconds ?? 90) * 1000)
+                        : LaunchDelayMs;
                     if (hit429)
-                        t.Status = "429 — cooling down 90s before next account";
+                        t.Status = $"429 — cooling down {wait / 1000}s before next account";
                     if (wait > 0) await Task.Delay(wait);
                 }
             }
@@ -307,9 +309,11 @@ public partial class AccountsViewModel : ObservableObject
                 f.IsBusy = false;
                 if (i < followers.Length - 1)
                 {
-                    int wait = hit429 ? RateLimitBackoffMs : LaunchDelayMs;
+                    int wait = hit429
+                        ? Math.Max(RateLimitBackoffMs, (res.RetryAfterSeconds ?? 90) * 1000)
+                        : LaunchDelayMs;
                     if (hit429)
-                        f.Status = "429 — cooling down 90s before next account";
+                        f.Status = $"429 — cooling down {wait / 1000}s before next account";
                     if (wait > 0) await Task.Delay(wait);
                 }
             }
