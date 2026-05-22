@@ -13,7 +13,7 @@ public partial class AccountsViewModel : ObservableObject
 
     [ObservableProperty] private string _gameInput = "";
     [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private int _launchDelayMs = 1500;
+    [ObservableProperty] private int _launchDelayMs = 6000;
 
     public AccountsViewModel()
     {

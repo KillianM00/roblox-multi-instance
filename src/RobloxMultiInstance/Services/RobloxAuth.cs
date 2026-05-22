@@ -315,17 +315,23 @@ public class RobloxAuth
         }
     }
 
-    public async Task<string?> GetAuthTicketAsync(string cookie, CancellationToken ct = default)
+    public record TicketResult(string? Ticket, string? Error);
+
+    public async Task<TicketResult> GetAuthTicketAsync(string cookie, CancellationToken ct = default)
     {
         using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
         probe.Headers.Referrer = new Uri(Referer);
         probe.Content = new StringContent("");
         using var probeResp = await AuthedClient.SendAsync(probe, ct);
+
+        if ((int)probeResp.StatusCode == 429)
+            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Increase the launch delay or wait a minute and retry.");
+
         if (!probeResp.Headers.TryGetValues("x-csrf-token", out var csrfValues))
-            return null;
+            return new TicketResult(null, $"No CSRF token from auth endpoint (HTTP {(int)probeResp.StatusCode}). Cookie may be invalid or expired.");
 
         var csrf = csrfValues.FirstOrDefault();
-        if (string.IsNullOrEmpty(csrf)) return null;
+        if (string.IsNullOrEmpty(csrf)) return new TicketResult(null, "Empty CSRF token");
 
         using var req = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
         req.Headers.Referrer = new Uri(Referer);
@@ -334,8 +340,16 @@ public class RobloxAuth
         req.Content = new StringContent("");
         using var resp = await AuthedClient.SendAsync(req, ct);
 
+        if ((int)resp.StatusCode == 429)
+            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Increase the launch delay or wait a minute and retry.");
+
         if (resp.Headers.TryGetValues("rbx-authentication-ticket", out var ticketValues))
-            return ticketValues.FirstOrDefault();
-        return null;
+        {
+            var ticket = ticketValues.FirstOrDefault();
+            if (!string.IsNullOrEmpty(ticket))
+                return new TicketResult(ticket, null);
+        }
+
+        return new TicketResult(null, $"Ticket endpoint returned HTTP {(int)resp.StatusCode} with no ticket header. Cookie may be invalid.");
     }
 }

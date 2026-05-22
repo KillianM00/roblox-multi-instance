@@ -23,8 +23,10 @@ public class RobloxLauncher
     {
         if (accountId.HasValue) _tracker.BeginLaunchAssociation(accountId.Value);
 
-        var ticket = await _auth.GetAuthTicketAsync(cookie, ct);
-        if (string.IsNullOrEmpty(ticket)) return new LaunchResult(false, "Failed to fetch auth ticket — cookie may be invalid or expired.");
+        var ticketResult = await _auth.GetAuthTicketAsync(cookie, ct);
+        if (string.IsNullOrEmpty(ticketResult.Ticket))
+            return new LaunchResult(false, ticketResult.Error ?? "Failed to fetch auth ticket.");
+        var ticket = ticketResult.Ticket;
 
         var unixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         long resolvedPlaceId = placeId is > 0 ? placeId.Value : DefaultPlaceId;
