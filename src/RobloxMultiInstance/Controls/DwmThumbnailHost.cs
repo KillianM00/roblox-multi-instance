@@ -32,6 +32,13 @@ public class DwmThumbnailHost : FrameworkElement
     private IntPtr _destHwnd = IntPtr.Zero;
     private Window? _hostWindow;
     private bool _registered;
+    private Win32.RECT _lastDest;
+    private Win32.RECT _lastSrc;
+    private bool _lastVisible;
+    private bool _hasLastProps;
+
+    private static bool RectsEqual(in Win32.RECT a, in Win32.RECT b)
+        => a.Left == b.Left && a.Top == b.Top && a.Right == b.Right && a.Bottom == b.Bottom;
 
     public DwmThumbnailHost()
     {
@@ -237,6 +244,11 @@ public class DwmThumbnailHost : FrameworkElement
                 Bottom = (int)Math.Round(clipped.Bottom),
             };
 
+            // Skip the P/Invoke if nothing actually changed since last update.
+            if (_hasLastProps && _lastVisible
+                && RectsEqual(_lastDest, dest) && RectsEqual(_lastSrc, src))
+                return;
+
             var props = new Dwm.DWM_THUMBNAIL_PROPERTIES
             {
                 dwFlags = Dwm.DWM_TNP_VISIBLE | Dwm.DWM_TNP_RECTDESTINATION
@@ -249,6 +261,10 @@ public class DwmThumbnailHost : FrameworkElement
                 rcSource = src,
             };
             Dwm.DwmUpdateThumbnailProperties(_thumbHandle, ref props);
+            _lastDest = dest;
+            _lastSrc = src;
+            _lastVisible = true;
+            _hasLastProps = true;
         }
         catch
         {
@@ -258,6 +274,7 @@ public class DwmThumbnailHost : FrameworkElement
     private void HideThumbnail()
     {
         if (_thumbHandle == IntPtr.Zero) return;
+        if (_hasLastProps && !_lastVisible) return;
         try
         {
             var props = new Dwm.DWM_THUMBNAIL_PROPERTIES
@@ -266,6 +283,8 @@ public class DwmThumbnailHost : FrameworkElement
                 fVisible = false,
             };
             Dwm.DwmUpdateThumbnailProperties(_thumbHandle, ref props);
+            _lastVisible = false;
+            _hasLastProps = true;
         }
         catch { }
     }

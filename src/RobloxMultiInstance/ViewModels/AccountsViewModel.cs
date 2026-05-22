@@ -123,27 +123,30 @@ public partial class AccountsViewModel : ObservableObject
             : Accounts.Where(a => a.IsSelected).ToArray();
         if (targets.Length == 0) targets = Accounts.ToArray();
 
-        foreach (var t in targets)
+        using (App.AccountStore.BeginBatch())
         {
-            t.IsBusy = true;
-            t.Status = "Checking...";
-            var info = await App.RobloxAuth.GetUserInfoAsync(t.Model.Cookie);
-            if (info != null)
+            foreach (var t in targets)
             {
-                t.Model.Username = info.Name;
-                t.Model.DisplayName = info.DisplayName;
-                t.Model.UserId = info.Id;
-                var avatar = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
-                if (avatar != null) t.Model.AvatarUrl = avatar;
-                App.AccountStore.Upsert(t.Model);
-                t.Status = "OK";
+                t.IsBusy = true;
+                t.Status = "Checking...";
+                var info = await App.RobloxAuth.GetUserInfoAsync(t.Model.Cookie);
+                if (info != null)
+                {
+                    t.Model.Username = info.Name;
+                    t.Model.DisplayName = info.DisplayName;
+                    t.Model.UserId = info.Id;
+                    var avatar = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
+                    if (avatar != null) t.Model.AvatarUrl = avatar;
+                    App.AccountStore.Upsert(t.Model);
+                    t.Status = "OK";
+                }
+                else
+                {
+                    t.Status = "Invalid/expired";
+                }
+                t.NotifyModelChanged();
+                t.IsBusy = false;
             }
-            else
-            {
-                t.Status = "Invalid/expired";
-            }
-            t.NotifyModelChanged();
-            t.IsBusy = false;
         }
     }
 
@@ -197,27 +200,30 @@ public partial class AccountsViewModel : ObservableObject
         if (!App.MutexHolder.IsHeld) App.MutexHolder.Acquire();
         SwitchToInstancesTab();
 
-        for (int i = 0; i < targets.Length; i++)
+        using (App.AccountStore.BeginBatch())
         {
-            var t = targets[i];
-            t.IsBusy = true;
-            t.Status = "Launching...";
-            var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id, privateServerLinkCode: linkCode, privateServerAccessCode: accessCode);
-            if (res.Success)
+            for (int i = 0; i < targets.Length; i++)
             {
-                t.Status = "Launched";
-                t.Model.LastUsedAt = DateTime.UtcNow;
-                App.AccountStore.Upsert(t.Model);
-                t.NotifyModelChanged();
-            }
-            else
-            {
-                t.Status = res.Error ?? "Launch failed";
-            }
-            t.IsBusy = false;
+                var t = targets[i];
+                t.IsBusy = true;
+                t.Status = "Launching...";
+                var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id, privateServerLinkCode: linkCode, privateServerAccessCode: accessCode);
+                if (res.Success)
+                {
+                    t.Status = "Launched";
+                    t.Model.LastUsedAt = DateTime.UtcNow;
+                    App.AccountStore.Upsert(t.Model);
+                    t.NotifyModelChanged();
+                }
+                else
+                {
+                    t.Status = res.Error ?? "Launch failed";
+                }
+                t.IsBusy = false;
 
-            if (i < targets.Length - 1 && LaunchDelayMs > 0)
-                await Task.Delay(LaunchDelayMs);
+                if (i < targets.Length - 1 && LaunchDelayMs > 0)
+                    await Task.Delay(LaunchDelayMs);
+            }
         }
     }
 
@@ -267,30 +273,33 @@ public partial class AccountsViewModel : ObservableObject
 
         leader.Status = $"Leading: {presence.LastLocation}";
 
-        for (int i = 0; i < followers.Length; i++)
+        using (App.AccountStore.BeginBatch())
         {
-            var f = followers[i];
-            f.IsBusy = true;
-            f.Status = $"Joining {presence.LastLocation}...";
-            var res = await App.RobloxLauncher.LaunchAsync(
-                f.Model.Cookie,
-                presence.PlaceId,
-                f.Model.Id,
-                jobId: presence.GameId);
-            if (res.Success)
+            for (int i = 0; i < followers.Length; i++)
             {
-                f.Status = "Joined leader's server";
-                f.Model.LastUsedAt = DateTime.UtcNow;
-                App.AccountStore.Upsert(f.Model);
-                f.NotifyModelChanged();
+                var f = followers[i];
+                f.IsBusy = true;
+                f.Status = $"Joining {presence.LastLocation}...";
+                var res = await App.RobloxLauncher.LaunchAsync(
+                    f.Model.Cookie,
+                    presence.PlaceId,
+                    f.Model.Id,
+                    jobId: presence.GameId);
+                if (res.Success)
+                {
+                    f.Status = "Joined leader's server";
+                    f.Model.LastUsedAt = DateTime.UtcNow;
+                    App.AccountStore.Upsert(f.Model);
+                    f.NotifyModelChanged();
+                }
+                else
+                {
+                    f.Status = res.Error ?? "Launch failed";
+                }
+                f.IsBusy = false;
+                if (i < followers.Length - 1 && LaunchDelayMs > 0)
+                    await Task.Delay(LaunchDelayMs);
             }
-            else
-            {
-                f.Status = res.Error ?? "Launch failed";
-            }
-            f.IsBusy = false;
-            if (i < followers.Length - 1 && LaunchDelayMs > 0)
-                await Task.Delay(LaunchDelayMs);
         }
     }
 

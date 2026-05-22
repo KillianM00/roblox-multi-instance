@@ -2,9 +2,15 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using RobloxMultiInstance.Models;
 
 namespace RobloxMultiInstance.Services;
+
+[JsonSerializable(typeof(List<Account>))]
+[JsonSerializable(typeof(Account))]
+internal partial class AccountStoreJsonContext : JsonSerializerContext { }
 
 public class AccountStore
 {
@@ -16,6 +22,8 @@ public class AccountStore
 
     private readonly List<Account> _accounts = new();
     private readonly object _lock = new();
+    private int _batchDepth;
+    private bool _pendingSave;
 
     public IReadOnlyList<Account> Accounts
     {
@@ -32,7 +40,7 @@ public class AccountStore
             {
                 var encrypted = File.ReadAllBytes(StorePath);
                 var json = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
-                var loaded = JsonSerializer.Deserialize<List<Account>>(json);
+                var loaded = JsonSerializer.Deserialize(json, AccountStoreJsonContext.Default.ListAccount);
                 if (loaded != null) _accounts.AddRange(loaded);
             }
             catch
@@ -45,10 +53,49 @@ public class AccountStore
     {
         lock (_lock)
         {
-            Directory.CreateDirectory(StoreDir);
-            var json = JsonSerializer.SerializeToUtf8Bytes(_accounts);
-            var encrypted = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(StorePath, encrypted);
+            if (_batchDepth > 0)
+            {
+                _pendingSave = true;
+                return;
+            }
+            WriteToDiskLocked();
+        }
+    }
+
+    private void WriteToDiskLocked()
+    {
+        Directory.CreateDirectory(StoreDir);
+        var json = JsonSerializer.SerializeToUtf8Bytes(_accounts, AccountStoreJsonContext.Default.ListAccount);
+        var encrypted = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
+        File.WriteAllBytes(StorePath, encrypted);
+        _pendingSave = false;
+    }
+
+    public IDisposable BeginBatch()
+    {
+        Interlocked.Increment(ref _batchDepth);
+        return new BatchScope(this);
+    }
+
+    private void EndBatch()
+    {
+        bool shouldWrite = false;
+        lock (_lock)
+        {
+            if (Interlocked.Decrement(ref _batchDepth) == 0 && _pendingSave)
+                shouldWrite = true;
+            if (shouldWrite) WriteToDiskLocked();
+        }
+    }
+
+    private sealed class BatchScope : IDisposable
+    {
+        private AccountStore? _store;
+        public BatchScope(AccountStore s) { _store = s; }
+        public void Dispose()
+        {
+            var s = Interlocked.Exchange(ref _store, null);
+            s?.EndBatch();
         }
     }
 

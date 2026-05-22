@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace RobloxMultiInstance.Services;
@@ -25,10 +24,35 @@ public class RobloxAuth
     }
     public record ShareLinkResolution(long PlaceId, string? PrivateServerLinkCode, string LinkType);
 
+    private static readonly HttpClient AuthedClient = BuildClient(TimeSpan.FromSeconds(20), "Roblox/WinInet");
+    private static readonly HttpClient AnonClient = BuildClient(TimeSpan.FromSeconds(10), "RobloxMultiInstance/0.1");
+
+    private static HttpClient BuildClient(TimeSpan timeout, string ua)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            UseCookies = false,
+            AllowAutoRedirect = true,
+            AutomaticDecompression = DecompressionMethods.All,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        };
+        var c = new HttpClient(handler) { Timeout = timeout };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd(ua);
+        return c;
+    }
+
+    private static HttpRequestMessage AuthedRequest(HttpMethod method, string url, string cookie)
+    {
+        var req = new HttpRequestMessage(method, url);
+        req.Headers.TryAddWithoutValidation("Cookie", $".ROBLOSECURITY={cookie}");
+        return req;
+    }
+
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
-        using var client = CreateClient(cookie);
-        using var resp = await client.GetAsync(AuthenticatedUserUrl, ct);
+        using var req = AuthedRequest(HttpMethod.Get, AuthenticatedUserUrl, cookie);
+        using var resp = await AuthedClient.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode) return null;
         var json = await resp.Content.ReadAsStringAsync(ct);
         try
@@ -49,15 +73,14 @@ public class RobloxAuth
     public async Task<ShareLinkResolution?> ResolveShareLinkAsync(string cookie, string linkId, string linkType, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(linkId)) return null;
-        using var client = CreateClient(cookie);
         var payload = JsonSerializer.Serialize(new { linkId, linkType });
 
         string? csrf = null;
-        using (var probe = new HttpRequestMessage(HttpMethod.Post, ResolveShareLinkUrl))
+        using (var probe = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie))
         {
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var probeResp = await client.SendAsync(probe, ct);
+            using var probeResp = await AuthedClient.SendAsync(probe, ct);
             if (probeResp.IsSuccessStatusCode)
             {
                 var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
@@ -69,11 +92,11 @@ public class RobloxAuth
 
         if (string.IsNullOrEmpty(csrf)) return null;
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, ResolveShareLinkUrl);
+        using var req = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie);
         req.Headers.Referrer = new Uri(Referer);
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-        using var resp = await client.SendAsync(req, ct);
+        using var resp = await AuthedClient.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode) return null;
         var json = await resp.Content.ReadAsStringAsync(ct);
         return ParseShareResolution(json, linkType);
@@ -116,15 +139,14 @@ public class RobloxAuth
     public async Task<PresenceInfo?> GetPresenceAsync(string cookie, long userId, CancellationToken ct = default)
     {
         if (userId <= 0) return null;
-        using var client = CreateClient(cookie);
         var payload = JsonSerializer.Serialize(new { userIds = new[] { userId } });
 
         string? csrf = null;
-        using (var probe = new HttpRequestMessage(HttpMethod.Post, PresenceUrl))
+        using (var probe = AuthedRequest(HttpMethod.Post, PresenceUrl, cookie))
         {
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var probeResp = await client.SendAsync(probe, ct);
+            using var probeResp = await AuthedClient.SendAsync(probe, ct);
             if (probeResp.IsSuccessStatusCode)
             {
                 var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
@@ -136,11 +158,11 @@ public class RobloxAuth
 
         if (string.IsNullOrEmpty(csrf)) return null;
 
-        using var req = new HttpRequestMessage(HttpMethod.Post, PresenceUrl);
+        using var req = AuthedRequest(HttpMethod.Post, PresenceUrl, cookie);
         req.Headers.Referrer = new Uri(Referer);
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-        using var resp = await client.SendAsync(req, ct);
+        using var resp = await AuthedClient.SendAsync(req, ct);
         if (!resp.IsSuccessStatusCode) return null;
         var json = await resp.Content.ReadAsStringAsync(ct);
         return ParsePresence(json);
@@ -175,15 +197,16 @@ public class RobloxAuth
         if (string.IsNullOrWhiteSpace(username)) return null;
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
             var payload = JsonSerializer.Serialize(new
             {
                 usernames = new[] { username.Trim() },
                 excludeBannedUsers = false,
             });
-            using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var resp = await client.PostAsync(UsernameLookupUrl, content, ct);
+            using var req = new HttpRequestMessage(HttpMethod.Post, UsernameLookupUrl)
+            {
+                Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json"),
+            };
+            using var resp = await AnonClient.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
@@ -206,9 +229,8 @@ public class RobloxAuth
         if (userId <= 0) return null;
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
-            using var resp = await client.GetAsync(string.Format(UserInfoByIdUrlTemplate, userId), ct);
+            using var req = new HttpRequestMessage(HttpMethod.Get, string.Format(UserInfoByIdUrlTemplate, userId));
+            using var resp = await AnonClient.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
@@ -227,16 +249,14 @@ public class RobloxAuth
     public async Task<FriendRequestResult> SendFriendRequestAsync(string cookie, long targetUserId, CancellationToken ct = default)
     {
         if (targetUserId <= 0) return new FriendRequestResult(false, "Invalid target user ID");
-        using var client = CreateClient(cookie);
         var url = string.Format(FriendRequestUrlTemplate, targetUserId);
 
         try
         {
-            // Probe for CSRF
-            using var probe = new HttpRequestMessage(HttpMethod.Post, url);
+            using var probe = AuthedRequest(HttpMethod.Post, url, cookie);
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent("");
-            using var probeResp = await client.SendAsync(probe, ct);
+            using var probeResp = await AuthedClient.SendAsync(probe, ct);
             if (probeResp.IsSuccessStatusCode)
                 return new FriendRequestResult(true, "Sent");
 
@@ -247,11 +267,11 @@ public class RobloxAuth
             if (string.IsNullOrEmpty(csrf))
                 return new FriendRequestResult(false, "Empty CSRF token");
 
-            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            using var req = AuthedRequest(HttpMethod.Post, url, cookie);
             req.Headers.Referrer = new Uri(Referer);
             req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
             req.Content = new StringContent("");
-            using var resp = await client.SendAsync(req, ct);
+            using var resp = await AuthedClient.SendAsync(req, ct);
             if (resp.IsSuccessStatusCode) return new FriendRequestResult(true, "Sent");
 
             var body = await resp.Content.ReadAsStringAsync(ct);
@@ -277,10 +297,8 @@ public class RobloxAuth
     {
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("RobloxMultiInstance/0.1");
-            var url = string.Format(ThumbnailUrlTemplate, userId);
-            using var resp = await client.GetAsync(url, ct);
+            using var req = new HttpRequestMessage(HttpMethod.Get, string.Format(ThumbnailUrlTemplate, userId));
+            using var resp = await AnonClient.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
@@ -299,47 +317,25 @@ public class RobloxAuth
 
     public async Task<string?> GetAuthTicketAsync(string cookie, CancellationToken ct = default)
     {
-        using var client = CreateClient(cookie);
-
-        // First call: provoke a CSRF token via 403 response
-        using (var probe = new HttpRequestMessage(HttpMethod.Post, AuthTicketUrl))
-        {
-            probe.Headers.Referrer = new Uri(Referer);
-            probe.Content = new StringContent("");
-            using var probeResp = await client.SendAsync(probe, ct);
-            if (!probeResp.Headers.TryGetValues("x-csrf-token", out var csrfValues))
-                return null;
-
-            var csrf = csrfValues.FirstOrDefault();
-            if (string.IsNullOrEmpty(csrf)) return null;
-
-            using var req = new HttpRequestMessage(HttpMethod.Post, AuthTicketUrl);
-            req.Headers.Referrer = new Uri(Referer);
-            req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
-            req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
-            req.Content = new StringContent("");
-            using var resp = await client.SendAsync(req, ct);
-
-            if (resp.Headers.TryGetValues("rbx-authentication-ticket", out var ticketValues))
-                return ticketValues.FirstOrDefault();
+        using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
+        probe.Headers.Referrer = new Uri(Referer);
+        probe.Content = new StringContent("");
+        using var probeResp = await AuthedClient.SendAsync(probe, ct);
+        if (!probeResp.Headers.TryGetValues("x-csrf-token", out var csrfValues))
             return null;
-        }
-    }
 
-    private static HttpClient CreateClient(string cookie)
-    {
-        var handler = new HttpClientHandler
-        {
-            UseCookies = false,
-            AllowAutoRedirect = true,
-            AutomaticDecompression = DecompressionMethods.All,
-        };
-        var client = new HttpClient(handler)
-        {
-            Timeout = TimeSpan.FromSeconds(20),
-        };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Roblox/WinInet");
-        client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", $".ROBLOSECURITY={cookie}");
-        return client;
+        var csrf = csrfValues.FirstOrDefault();
+        if (string.IsNullOrEmpty(csrf)) return null;
+
+        using var req = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
+        req.Headers.Referrer = new Uri(Referer);
+        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
+        req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
+        req.Content = new StringContent("");
+        using var resp = await AuthedClient.SendAsync(req, ct);
+
+        if (resp.Headers.TryGetValues("rbx-authentication-ticket", out var ticketValues))
+            return ticketValues.FirstOrDefault();
+        return null;
     }
 }

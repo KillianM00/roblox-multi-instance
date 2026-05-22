@@ -25,7 +25,7 @@ public class RobloxProcessTracker
     {
         _timer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(750),
+            Interval = TimeSpan.FromMilliseconds(1500),
         };
         _timer.Tick += (_, _) => Refresh();
     }
@@ -107,20 +107,33 @@ public class RobloxProcessTracker
 
                 try
                 {
-                    p.Refresh();
-                    var hwnd = p.MainWindowHandle;
-                    if (hwnd != IntPtr.Zero)
+                    // Only re-resolve the window handle if we don't have one or the cached one died.
+                    // Process.MainWindowHandle internally walks the process's threads — avoid it on every tick.
+                    if (inst.Hwnd == IntPtr.Zero || !Win32.IsWindow(inst.Hwnd))
                     {
-                        if (hwnd != inst.Hwnd)
+                        p.Refresh();
+                        var hwnd = p.MainWindowHandle;
+                        if (hwnd != IntPtr.Zero && hwnd != inst.Hwnd)
                         {
                             inst.Hwnd = hwnd;
                             changed = true;
                         }
-                        var title = p.MainWindowTitle;
-                        if (!string.IsNullOrEmpty(title) && title != inst.Title)
+                    }
+
+                    // Cheap title read off the cached HWND (no thread enumeration).
+                    if (inst.Hwnd != IntPtr.Zero)
+                    {
+                        int len = Win32.GetWindowTextLength(inst.Hwnd);
+                        if (len > 0)
                         {
-                            inst.Title = title;
-                            changed = true;
+                            var sb = new System.Text.StringBuilder(len + 1);
+                            Win32.GetWindowText(inst.Hwnd, sb, sb.Capacity);
+                            var title = sb.ToString();
+                            if (!string.IsNullOrEmpty(title) && title != inst.Title)
+                            {
+                                inst.Title = title;
+                                changed = true;
+                            }
                         }
                     }
                 }
