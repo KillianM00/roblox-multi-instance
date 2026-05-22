@@ -6,6 +6,9 @@ namespace RobloxMultiInstance.Services;
 
 public class RobloxAuth
 {
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Token, DateTime Expires)> CsrfCache = new();
+    private static readonly TimeSpan CsrfTtl = TimeSpan.FromMinutes(5);
+
     private const string AuthTicketUrl = "https://auth.roblox.com/v1/authentication-ticket/";
     private const string AuthenticatedUserUrl = "https://users.roblox.com/v1/users/authenticated";
     private const string ThumbnailUrlTemplate = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={0}&size=150x150&format=Png&isCircular=true";
@@ -47,6 +50,25 @@ public class RobloxAuth
         var req = new HttpRequestMessage(method, url);
         req.Headers.TryAddWithoutValidation("Cookie", $".ROBLOSECURITY={cookie}");
         return req;
+    }
+
+    private static string CookieKey(string cookie)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(cookie));
+        return Convert.ToHexString(bytes);
+    }
+
+    private static void CacheCsrf(string cookie, string token)
+    {
+        CsrfCache[CookieKey(cookie)] = (token, DateTime.UtcNow.Add(CsrfTtl));
+    }
+
+    private static string? GetCachedCsrf(string cookie)
+    {
+        if (CsrfCache.TryGetValue(CookieKey(cookie), out var entry) && DateTime.UtcNow < entry.Expires)
+            return entry.Token;
+        return null;
     }
 
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
@@ -317,39 +339,76 @@ public class RobloxAuth
 
     public record TicketResult(string? Ticket, string? Error);
 
+    private async Task<HttpResponseMessage> SendTicketRequestAsync(string cookie, string csrf, CancellationToken ct)
+    {
+        var req = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
+        req.Headers.Referrer = new Uri(Referer);
+        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
+        req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
+        req.Content = new StringContent("");
+        return await AuthedClient.SendAsync(req, ct);
+    }
+
     public async Task<TicketResult> GetAuthTicketAsync(string cookie, CancellationToken ct = default)
     {
+        // Try cached CSRF first to halve request count under steady use.
+        var cached = GetCachedCsrf(cookie);
+        if (cached != null)
+        {
+            using var resp = await SendTicketRequestAsync(cookie, cached, ct);
+            if ((int)resp.StatusCode == 429)
+                return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");
+            if (resp.IsSuccessStatusCode && resp.Headers.TryGetValues("rbx-authentication-ticket", out var tv))
+            {
+                var t = tv.FirstOrDefault();
+                if (!string.IsNullOrEmpty(t)) return new TicketResult(t, null);
+            }
+            // Cached CSRF rejected; refresh below.
+            if (resp.Headers.TryGetValues("x-csrf-token", out var fresh))
+            {
+                var f = fresh.FirstOrDefault();
+                if (!string.IsNullOrEmpty(f))
+                {
+                    CacheCsrf(cookie, f);
+                    using var retry = await SendTicketRequestAsync(cookie, f, ct);
+                    if ((int)retry.StatusCode == 429)
+                        return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");
+                    if (retry.Headers.TryGetValues("rbx-authentication-ticket", out var t2))
+                    {
+                        var v = t2.FirstOrDefault();
+                        if (!string.IsNullOrEmpty(v)) return new TicketResult(v, null);
+                    }
+                }
+            }
+        }
+
+        // No cache hit — do the standard probe.
         using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
         probe.Headers.Referrer = new Uri(Referer);
         probe.Content = new StringContent("");
         using var probeResp = await AuthedClient.SendAsync(probe, ct);
 
         if ((int)probeResp.StatusCode == 429)
-            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Increase the launch delay or wait a minute and retry.");
+            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");
 
         if (!probeResp.Headers.TryGetValues("x-csrf-token", out var csrfValues))
             return new TicketResult(null, $"No CSRF token from auth endpoint (HTTP {(int)probeResp.StatusCode}). Cookie may be invalid or expired.");
 
         var csrf = csrfValues.FirstOrDefault();
         if (string.IsNullOrEmpty(csrf)) return new TicketResult(null, "Empty CSRF token");
+        CacheCsrf(cookie, csrf);
 
-        using var req = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
-        req.Headers.Referrer = new Uri(Referer);
-        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
-        req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
-        req.Content = new StringContent("");
-        using var resp = await AuthedClient.SendAsync(req, ct);
+        using var resp2 = await SendTicketRequestAsync(cookie, csrf, ct);
+        if ((int)resp2.StatusCode == 429)
+            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");
 
-        if ((int)resp.StatusCode == 429)
-            return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Increase the launch delay or wait a minute and retry.");
-
-        if (resp.Headers.TryGetValues("rbx-authentication-ticket", out var ticketValues))
+        if (resp2.Headers.TryGetValues("rbx-authentication-ticket", out var ticketValues))
         {
             var ticket = ticketValues.FirstOrDefault();
             if (!string.IsNullOrEmpty(ticket))
                 return new TicketResult(ticket, null);
         }
 
-        return new TicketResult(null, $"Ticket endpoint returned HTTP {(int)resp.StatusCode} with no ticket header. Cookie may be invalid.");
+        return new TicketResult(null, $"Ticket endpoint returned HTTP {(int)resp2.StatusCode} with no ticket header. Cookie may be invalid.");
     }
 }

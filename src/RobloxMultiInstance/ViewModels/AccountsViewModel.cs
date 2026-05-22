@@ -13,7 +13,8 @@ public partial class AccountsViewModel : ObservableObject
 
     [ObservableProperty] private string _gameInput = "";
     [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private int _launchDelayMs = 6000;
+    [ObservableProperty] private int _launchDelayMs = 15000;
+    private const int RateLimitBackoffMs = 90_000;
 
     public AccountsViewModel()
     {
@@ -208,6 +209,7 @@ public partial class AccountsViewModel : ObservableObject
                 t.IsBusy = true;
                 t.Status = "Launching...";
                 var res = await App.RobloxLauncher.LaunchAsync(t.Model.Cookie, placeId, t.Model.Id, privateServerLinkCode: linkCode, privateServerAccessCode: accessCode);
+                bool hit429 = !res.Success && (res.Error?.Contains("429") ?? false);
                 if (res.Success)
                 {
                     t.Status = "Launched";
@@ -221,8 +223,13 @@ public partial class AccountsViewModel : ObservableObject
                 }
                 t.IsBusy = false;
 
-                if (i < targets.Length - 1 && LaunchDelayMs > 0)
-                    await Task.Delay(LaunchDelayMs);
+                if (i < targets.Length - 1)
+                {
+                    int wait = hit429 ? RateLimitBackoffMs : LaunchDelayMs;
+                    if (hit429)
+                        t.Status = "429 — cooling down 90s before next account";
+                    if (wait > 0) await Task.Delay(wait);
+                }
             }
         }
     }
@@ -285,6 +292,7 @@ public partial class AccountsViewModel : ObservableObject
                     presence.PlaceId,
                     f.Model.Id,
                     jobId: presence.GameId);
+                bool hit429 = !res.Success && (res.Error?.Contains("429") ?? false);
                 if (res.Success)
                 {
                     f.Status = "Joined leader's server";
@@ -297,8 +305,13 @@ public partial class AccountsViewModel : ObservableObject
                     f.Status = res.Error ?? "Launch failed";
                 }
                 f.IsBusy = false;
-                if (i < followers.Length - 1 && LaunchDelayMs > 0)
-                    await Task.Delay(LaunchDelayMs);
+                if (i < followers.Length - 1)
+                {
+                    int wait = hit429 ? RateLimitBackoffMs : LaunchDelayMs;
+                    if (hit429)
+                        f.Status = "429 — cooling down 90s before next account";
+                    if (wait > 0) await Task.Delay(wait);
+                }
             }
         }
     }
