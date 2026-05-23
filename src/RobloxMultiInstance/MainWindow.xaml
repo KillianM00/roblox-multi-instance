@@ -58,9 +58,15 @@
                             BorderThickness="0" />
                     <Button Content="Network"
                             Command="{Binding GoToNetworkCommand}"
-                            Padding="18,7"
+                            Padding="18,7" Margin="0,0,6,0"
                             Background="{Binding CurrentTab, Converter={StaticResource TabSelectedToBrushConverter}, ConverterParameter=Network}"
                             Foreground="{Binding CurrentTab, Converter={StaticResource TabSelectedToForegroundConverter}, ConverterParameter=Network}"
+                            BorderThickness="0" />
+                    <Button Content="Generate"
+                            Command="{Binding GoToGenerateCommand}"
+                            Padding="18,7"
+                            Background="{Binding CurrentTab, Converter={StaticResource TabSelectedToBrushConverter}, ConverterParameter=Generate}"
+                            Foreground="{Binding CurrentTab, Converter={StaticResource TabSelectedToForegroundConverter}, ConverterParameter=Generate}"
                             BorderThickness="0" />
                 </StackPanel>
 
@@ -80,6 +86,7 @@
             <views:AccountsView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Accounts}" />
             <views:InstancesView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Instances}" />
             <views:NetworkView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Network}" />
+            <views:GenerateView Visibility="{Binding DataContext.CurrentTab, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource TabVisibilityConverter}, ConverterParameter=Generate}" />
         </Grid>
     </Grid>
 </Window>

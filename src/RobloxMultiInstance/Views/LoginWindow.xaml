@@ -18,8 +18,9 @@
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
                 Padding="16,12">
             <StackPanel>
-                <TextBlock Text="Sign in to Roblox" FontWeight="SemiBold" FontSize="15" />
-                <TextBlock Text="Log into the account you want to add. We'll capture the session cookie automatically and close this window. The browser session uses a fresh temp profile that's discarded after."
+                <TextBlock x:Name="HeadingText" Text="Sign in to Roblox" FontWeight="SemiBold" FontSize="15" />
+                <TextBlock x:Name="SubHeadingText"
+                           Text="Log into the account you want to add. We'll capture the session cookie automatically and close this window. The browser session uses a fresh temp profile that's discarded after."
                            FontSize="11" Foreground="{StaticResource MutedTextBrush}"
                            TextWrapping="Wrap" Margin="0,4,0,0" />
             </StackPanel>

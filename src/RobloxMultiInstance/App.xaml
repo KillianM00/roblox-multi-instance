@@ -23,8 +23,8 @@
             <Color x:Key="PanelColor">#FF2A2A2F</Color>
             <Color x:Key="PanelAltColor">#FF33333A</Color>
             <Color x:Key="BorderColor">#FF3F3F46</Color>
-            <Color x:Key="TextColor">#FFE8E8EA</Color>
-            <Color x:Key="MutedTextColor">#FF9A9AA0</Color>
+            <Color x:Key="TextColor">#FFF2F2F4</Color>
+            <Color x:Key="MutedTextColor">#FFC8C8CE</Color>
             <Color x:Key="AccentColor">#FF4F46E5</Color>
             <Color x:Key="AccentHoverColor">#FF6366F1</Color>
             <Color x:Key="DangerColor">#FFDC2626</Color>

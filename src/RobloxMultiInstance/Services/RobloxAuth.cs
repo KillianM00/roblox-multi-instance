@@ -1,13 +1,23 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace RobloxMultiInstance.Services;
 
 public class RobloxAuth
 {
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Token, DateTime Expires)> CsrfCache = new();
+    private static readonly ConcurrentDictionary<string, (string Token, DateTime Expires)> CsrfCache = new();
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> CookieGates = new();
     private static readonly TimeSpan CsrfTtl = TimeSpan.FromMinutes(5);
+    private static readonly Regex CookieRotationRegex = new(@"\.ROBLOSECURITY=([^;]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Fired when an authed response sets a NEW .ROBLOSECURITY cookie value
+    /// different from the one we sent — Roblox rotates these to extend session
+    /// liveness. App.xaml.cs subscribes and propagates to AccountStore so the new
+    /// cookie value is what we use going forward.</summary>
+    public static event Action<string, string>? CookieRotated;
 
     private const string AuthTicketUrl = "https://auth.roblox.com/v1/authentication-ticket/";
     private const string AuthenticatedUserUrl = "https://users.roblox.com/v1/users/authenticated";
@@ -86,6 +96,45 @@ public class RobloxAuth
         return req;
     }
 
+    private static SemaphoreSlim GateFor(string cookie)
+        => CookieGates.GetOrAdd(CookieKey(cookie), _ => new SemaphoreSlim(1, 1));
+
+    /// <summary>Serializes all authed traffic for a single cookie (one in-flight
+    /// request at a time) and inspects Set-Cookie on the response for a rotated
+    /// .ROBLOSECURITY value, firing CookieRotated if found.</summary>
+    internal static async Task<HttpResponseMessage> SendAuthedAsync(HttpRequestMessage req, string cookie, CancellationToken ct)
+    {
+        var gate = GateFor(cookie);
+        await gate.WaitAsync(ct);
+        try
+        {
+            var resp = await SendAuthedAsync(req, cookie, ct);
+            CheckCookieRotation(resp, cookie);
+            return resp;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static void CheckCookieRotation(HttpResponseMessage resp, string oldCookie)
+    {
+        if (!resp.Headers.TryGetValues("Set-Cookie", out var setCookies)) return;
+        foreach (var sc in setCookies)
+        {
+            var m = CookieRotationRegex.Match(sc);
+            if (!m.Success) continue;
+            var newValue = m.Groups[1].Value;
+            // Roblox sometimes deletes the cookie via Set-Cookie with an Expires in the past.
+            // Treat the deletion as a no-op (we'd lose auth) and rely on the validity monitor.
+            if (string.IsNullOrEmpty(newValue) || newValue == "deleted") continue;
+            if (newValue == oldCookie) continue;
+            try { CookieRotated?.Invoke(oldCookie, newValue); } catch { }
+            return;
+        }
+    }
+
     private static string CookieKey(string cookie)
     {
         using var sha = System.Security.Cryptography.SHA256.Create();
@@ -130,7 +179,7 @@ public class RobloxAuth
                 DecorateAuthed(probe);
                 probe.Headers.Referrer = new Uri(Referer);
                 probe.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
-                using var resp = await AuthedClient.SendAsync(probe, ct);
+                using var resp = await SendAuthedAsync(probe, cookie, ct);
 
                 if (resp.Headers.TryGetValues("x-csrf-token", out var v))
                 {
@@ -163,7 +212,7 @@ public class RobloxAuth
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
         using var req = AuthedRequest(HttpMethod.Get, AuthenticatedUserUrl, cookie);
-        using var resp = await AuthedClient.SendAsync(req, ct);
+        using var resp = await SendAuthedAsync(req, cookie, ct);
         if (!resp.IsSuccessStatusCode) return null;
         var json = await resp.Content.ReadAsStringAsync(ct);
         try
@@ -210,7 +259,7 @@ public class RobloxAuth
             req.Headers.Referrer = new Uri(Referer);
             req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrfToken);
             req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var resp = await AuthedClient.SendAsync(req, ct);
+            using var resp = await SendAuthedAsync(req, cookie, ct);
             if (resp.IsSuccessStatusCode)
             {
                 var ok = await resp.Content.ReadAsStringAsync(ct);
@@ -274,7 +323,7 @@ public class RobloxAuth
         {
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var probeResp = await AuthedClient.SendAsync(probe, ct);
+            using var probeResp = await SendAuthedAsync(probe, cookie, ct);
             if (probeResp.IsSuccessStatusCode)
             {
                 var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
@@ -290,7 +339,7 @@ public class RobloxAuth
         req.Headers.Referrer = new Uri(Referer);
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-        using var resp = await AuthedClient.SendAsync(req, ct);
+        using var resp = await SendAuthedAsync(req, cookie, ct);
         if (!resp.IsSuccessStatusCode) return null;
         var json = await resp.Content.ReadAsStringAsync(ct);
         return ParsePresence(json);
@@ -384,7 +433,7 @@ public class RobloxAuth
             using var probe = AuthedRequest(HttpMethod.Post, url, cookie);
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent("");
-            using var probeResp = await AuthedClient.SendAsync(probe, ct);
+            using var probeResp = await SendAuthedAsync(probe, cookie, ct);
             if (probeResp.IsSuccessStatusCode)
                 return new FriendRequestResult(true, "Sent");
 
@@ -399,7 +448,7 @@ public class RobloxAuth
             req.Headers.Referrer = new Uri(Referer);
             req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
             req.Content = new StringContent("");
-            using var resp = await AuthedClient.SendAsync(req, ct);
+            using var resp = await SendAuthedAsync(req, cookie, ct);
             if (resp.IsSuccessStatusCode) return new FriendRequestResult(true, "Sent");
 
             var body = await resp.Content.ReadAsStringAsync(ct);
@@ -453,7 +502,7 @@ public class RobloxAuth
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Headers.TryAddWithoutValidation("RBXAuthenticationNegotiation", "1");
         req.Content = new StringContent("");
-        return await AuthedClient.SendAsync(req, ct);
+        return await SendAuthedAsync(req, cookie, ct);
     }
 
     public async Task<TicketResult> GetAuthTicketAsync(string cookie, CancellationToken ct = default)
@@ -493,7 +542,7 @@ public class RobloxAuth
         using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
         probe.Headers.Referrer = new Uri(Referer);
         probe.Content = new StringContent("");
-        using var probeResp = await AuthedClient.SendAsync(probe, ct);
+        using var probeResp = await SendAuthedAsync(probe, cookie, ct);
 
         if ((int)probeResp.StatusCode == 429)
             return new TicketResult(null, "Rate limited by Roblox (HTTP 429). Wait 1-2 minutes or raise the launch delay.");

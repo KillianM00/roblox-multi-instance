@@ -60,7 +60,10 @@
         </Border>
 
         <!-- Account list -->
-        <DataGrid Grid.Row="2" ItemsSource="{Binding Accounts}" RowHeight="56">
+        <DataGrid Grid.Row="2" ItemsSource="{Binding Accounts}" RowHeight="56"
+                  FrozenColumnCount="3"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto">
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="" Width="36">
                     <DataGridTemplateColumn.CellTemplate>
@@ -119,20 +122,20 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
-                <DataGridTemplateColumn Header="" Width="490">
+                <DataGridTemplateColumn Header="" Width="380">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
-                                <Button Content="Re-sign in"
+                                <Button Content="Re-auth"
                                         Style="{StaticResource SecondaryButton}"
-                                        Margin="0,0,4,0" Padding="8,3"
+                                        Margin="0,0,3,0" Padding="6,2"
                                         ToolTip="Re-authenticate via embedded browser to refresh the cookie."
                                         Command="{Binding DataContext.ReSignInCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Launch"
                                         Style="{StaticResource PrimaryButton}"
-                                        Margin="0,0,4,0" Padding="8,3"
+                                        Margin="0,0,3,0" Padding="6,2"
                                         Command="{Binding DataContext.LaunchOneCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Kill"
@@ -143,18 +146,18 @@
                                         CommandParameter="{Binding}" />
                                 <Button Content="Follow"
                                         Style="{StaticResource SecondaryButton}"
-                                        Margin="0,0,4,0" Padding="8,3"
+                                        Margin="0,0,3,0" Padding="6,2"
                                         ToolTip="Send other selected accounts into THIS account's current game/server."
                                         Command="{Binding DataContext.FollowLeaderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Edit"
                                         Style="{StaticResource SecondaryButton}"
-                                        Margin="0,0,4,0" Padding="8,3"
+                                        Margin="0,0,3,0" Padding="6,2"
                                         Command="{Binding DataContext.EditAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                                 <Button Content="Delete"
                                         Style="{StaticResource DangerButton}"
-                                        Padding="8,3"
+                                        Padding="6,2"
                                         Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}" />
                             </StackPanel>

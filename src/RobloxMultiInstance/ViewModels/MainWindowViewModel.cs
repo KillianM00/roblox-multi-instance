@@ -21,4 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private void GoToNetwork() => CurrentTab = "Network";
+
+    [RelayCommand]
+    private void GoToGenerate() => CurrentTab = "Generate";
 }

@@ -7,6 +7,10 @@ namespace RobloxMultiInstance.Views;
 public partial class LoginWindow : Window
 {
     public string? CapturedCookie { get; private set; }
+    public string StartUrl { get; set; } = "https://www.roblox.com/login";
+    public string Heading { get; set; } = "Sign in to Roblox";
+    public string SubHeading { get; set; } = "Log into the account you want to add. We'll capture the session cookie automatically and close this window. The browser session uses a fresh temp profile that's discarded after.";
+
     private bool _captured;
     private string? _profileFolder;
 
@@ -29,7 +33,9 @@ public partial class LoginWindow : Window
 
             Web.CoreWebView2.NavigationCompleted += OnNavCompleted;
             Web.CoreWebView2.NavigationStarting += OnNavStarting;
-            Web.CoreWebView2.Navigate("https://www.roblox.com/login");
+            HeadingText.Text = Heading;
+            SubHeadingText.Text = SubHeading;
+            Web.CoreWebView2.Navigate(StartUrl);
             LoadingOverlay.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
