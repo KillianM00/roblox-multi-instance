@@ -26,6 +26,7 @@ public class RobloxAuth
         public bool InGame => Type == 2 && PlaceId.HasValue && PlaceId.Value > 0;
     }
     public record ShareLinkResolution(long PlaceId, string? PrivateServerLinkCode, string LinkType);
+    public record ShareLinkResult(ShareLinkResolution? Data, string? Error);
 
     private const string BrowserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -125,36 +126,59 @@ public class RobloxAuth
         }
     }
 
-    public async Task<ShareLinkResolution?> ResolveShareLinkAsync(string cookie, string linkId, string linkType, CancellationToken ct = default)
+    public async Task<ShareLinkResult> ResolveShareLinkAsync(string cookie, string linkId, string linkType, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(linkId)) return null;
+        if (string.IsNullOrWhiteSpace(linkId)) return new ShareLinkResult(null, "Empty link id.");
         var payload = JsonSerializer.Serialize(new { linkId, linkType });
 
         string? csrf = null;
+        string? lastBody = null;
+        int lastStatus = 0;
         using (var probe = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie))
         {
+            DecorateAuthed(probe);
             probe.Headers.Referrer = new Uri(Referer);
             probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
             using var probeResp = await AuthedClient.SendAsync(probe, ct);
+            lastStatus = (int)probeResp.StatusCode;
             if (probeResp.IsSuccessStatusCode)
             {
                 var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
-                return ParseShareResolution(jsonOk, linkType);
+                var parsed = ParseShareResolution(jsonOk, linkType);
+                return parsed != null
+                    ? new ShareLinkResult(parsed, null)
+                    : new ShareLinkResult(null, $"Resolved but couldn't parse response body. Raw: {Truncate(jsonOk, 240)}");
             }
+            lastBody = await probeResp.Content.ReadAsStringAsync(ct);
             if (probeResp.Headers.TryGetValues("x-csrf-token", out var v))
                 csrf = v.FirstOrDefault();
         }
 
-        if (string.IsNullOrEmpty(csrf)) return null;
+        if (string.IsNullOrEmpty(csrf))
+            return new ShareLinkResult(null, $"HTTP {lastStatus} with no CSRF token. Body: {Truncate(lastBody, 240)}");
 
         using var req = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie);
+        DecorateAuthed(req);
         req.Headers.Referrer = new Uri(Referer);
         req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
         req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
         using var resp = await AuthedClient.SendAsync(req, ct);
-        if (!resp.IsSuccessStatusCode) return null;
+        if (!resp.IsSuccessStatusCode)
+        {
+            var errBody = await resp.Content.ReadAsStringAsync(ct);
+            return new ShareLinkResult(null, $"HTTP {(int)resp.StatusCode}: {Truncate(errBody, 240)}");
+        }
         var json = await resp.Content.ReadAsStringAsync(ct);
-        return ParseShareResolution(json, linkType);
+        var resolved = ParseShareResolution(json, linkType);
+        return resolved != null
+            ? new ShareLinkResult(resolved, null)
+            : new ShareLinkResult(null, $"Resolved but couldn't parse response. Raw: {Truncate(json, 240)}");
+    }
+
+    private static string Truncate(string? s, int n)
+    {
+        if (string.IsNullOrEmpty(s)) return "(empty)";
+        return s.Length <= n ? s : s.Substring(0, n) + "...";
     }
 
     private static ShareLinkResolution? ParseShareResolution(string json, string linkType)

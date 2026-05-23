@@ -165,14 +165,27 @@ public partial class AccountsViewModel : ObservableObject
             var code = share.Groups[1].Value;
             var type = share.Groups[2].Success && !string.IsNullOrEmpty(share.Groups[2].Value)
                 ? share.Groups[2].Value : "Server";
-            var resolved = await App.RobloxAuth.ResolveShareLinkAsync(cookieForResolution, code, type);
-            if (resolved == null)
+
+            // Try each selected account's cookie until one resolves — different accounts
+            // may have different access to the link's owner / different rate-limit state.
+            var cookies = new List<string> { cookieForResolution };
+            foreach (var a in Accounts.Where(a => a.IsSelected && a.Model.Cookie != cookieForResolution))
+                cookies.Add(a.Model.Cookie);
+
+            string? lastErr = null;
+            foreach (var c in cookies)
             {
-                MessageBox.Show($"Couldn't resolve the share link (type={type}). It may be expired, revoked, or the resolving account may lack access.",
-                    "Share link resolution failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return null;
+                var result = await App.RobloxAuth.ResolveShareLinkAsync(c, code, type);
+                if (result.Data != null)
+                    return (result.Data.PlaceId, result.Data.PrivateServerLinkCode, null);
+                lastErr = result.Error;
             }
-            return (resolved.PlaceId, resolved.PrivateServerLinkCode, null);
+
+            MessageBox.Show(
+                $"Couldn't resolve the share link (type={type}).\n\nLast error: {lastErr ?? "(no details)"}\n\nPossible causes: link expired/revoked, the resolving account lacks access (private servers need an invite), or the IP is rate-limited.",
+                "Share link resolution failed",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
         }
 
         if (RobloxLauncher.TryParseGameLink(GameInput, out var parsed) && parsed is not null)
