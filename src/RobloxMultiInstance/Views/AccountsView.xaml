@@ -106,12 +106,30 @@
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="100" />
                 <DataGridTextColumn Header="Last used" Binding="{Binding LastUsed}" Width="140" />
+                <DataGridTemplateColumn Header="Session" Width="150">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse Width="9" Height="9" VerticalAlignment="Center"
+                                         Fill="{Binding IsValid, Converter={StaticResource BoolToBrushConverter}}" />
+                                <TextBlock Text="{Binding ValidityLabel}" Margin="6,0,0,0"
+                                           Foreground="{StaticResource MutedTextBrush}" FontSize="10" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*" />
-                <DataGridTemplateColumn Header="" Width="400">
+                <DataGridTemplateColumn Header="" Width="490">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
+                                <Button Content="Re-sign in"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Margin="0,0,4,0" Padding="8,3"
+                                        ToolTip="Re-authenticate via embedded browser to refresh the cookie."
+                                        Command="{Binding DataContext.ReSignInCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
                                 <Button Content="Launch"
                                         Style="{StaticResource PrimaryButton}"
                                         Margin="0,0,4,0" Padding="8,3"
@@ -159,6 +177,9 @@
                     Command="{Binding FriendUserCommand}" />
             <Button Content="Kill All Roblox" Style="{StaticResource DangerButton}" Margin="8,0,0,0"
                     Command="{Binding KillAllCommand}" />
+            <Button Content="Check All Sessions" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                    Command="{Binding CheckAllValidityCommand}"
+                    ToolTip="Hit /users/authenticated for every account right now to refresh the green/red session pill." />
         </StackPanel>
 
         <!-- Status -->

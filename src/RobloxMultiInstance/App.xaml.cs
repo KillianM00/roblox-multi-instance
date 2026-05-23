@@ -10,6 +10,7 @@ public partial class App : Application
     public static RobloxAuth RobloxAuth { get; } = new();
     public static RobloxProcessTracker ProcessTracker { get; } = new();
     public static RobloxLauncher RobloxLauncher { get; } = new(RobloxAuth, ProcessTracker);
+    public static AccountValidityMonitor ValidityMonitor { get; } = new(RobloxAuth, AccountStore);
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -17,10 +18,12 @@ public partial class App : Application
         MutexHolder.Acquire();
         AccountStore.Load();
         ProcessTracker.Start();
+        ValidityMonitor.Start();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        ValidityMonitor.Stop();
         ProcessTracker.Stop();
         MutexHolder.Dispose();
         base.OnExit(e);

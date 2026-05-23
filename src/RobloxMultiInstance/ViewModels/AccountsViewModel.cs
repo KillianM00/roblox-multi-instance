@@ -19,6 +19,18 @@ public partial class AccountsViewModel : ObservableObject
     public AccountsViewModel()
     {
         ReloadAccounts();
+        App.ValidityMonitor.ValidityChanged += OnValidityChanged;
+    }
+
+    private void OnValidityChanged(Guid accountId, bool valid)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null) return;
+        dispatcher.BeginInvoke(new Action(() =>
+        {
+            var row = Accounts.FirstOrDefault(a => a.Id == accountId);
+            if (row != null) row.NotifyModelChanged();
+        }));
     }
 
     private void ReloadAccounts()
@@ -45,6 +57,63 @@ public partial class AccountsViewModel : ObservableObject
             App.AccountStore.Upsert(vm.Result);
             ReloadAccounts();
         }
+    }
+
+    [RelayCommand]
+    private async Task ReSignInAsync(AccountItemViewModel? item)
+    {
+        if (item == null) return;
+        var login = new LoginWindow { Owner = Application.Current.MainWindow };
+        if (login.ShowDialog() != true || string.IsNullOrWhiteSpace(login.CapturedCookie)) return;
+
+        var cookie = login.CapturedCookie!;
+        var info = await App.RobloxAuth.GetUserInfoAsync(cookie);
+        if (info == null)
+        {
+            MessageBox.Show("Captured a cookie but couldn't verify it. Re-sign-in cancelled.",
+                "Verification failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (item.Model.UserId.HasValue && info.Id != item.Model.UserId.Value)
+        {
+            var proceed = MessageBox.Show(
+                $"The browser logged in as {info.Name} (ID {info.Id}) but this row is {item.Model.Username} (ID {item.Model.UserId}). Replace the cookie anyway?",
+                "Different account", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (proceed != MessageBoxResult.Yes) return;
+        }
+
+        item.Model.Cookie = cookie;
+        item.Model.Username = info.Name;
+        item.Model.DisplayName = info.DisplayName;
+        item.Model.UserId = info.Id;
+        item.Model.IsValid = true;
+        item.Model.LastValidatedAt = DateTime.UtcNow;
+        var avatar = await App.RobloxAuth.GetAvatarHeadshotUrlAsync(info.Id);
+        if (avatar != null) item.Model.AvatarUrl = avatar;
+
+        App.AccountStore.Upsert(item.Model);
+        item.NotifyModelChanged();
+        item.Status = "Re-signed in";
+    }
+
+    [RelayCommand]
+    private async Task CheckValidityAsync(AccountItemViewModel? item)
+    {
+        if (item == null) return;
+        item.IsBusy = true;
+        item.Status = "Checking...";
+        var ok = await App.ValidityMonitor.CheckOneAsync(item.Id);
+        item.Status = ok ? "Valid" : "Logged out";
+        item.NotifyModelChanged();
+        item.IsBusy = false;
+    }
+
+    [RelayCommand]
+    private async Task CheckAllValidityAsync()
+    {
+        await App.ValidityMonitor.CheckAllAsync();
+        ReloadAccounts();
     }
 
     [RelayCommand]
