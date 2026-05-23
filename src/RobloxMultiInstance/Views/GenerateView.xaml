@@ -138,8 +138,7 @@
                     <!-- Create button -->
                     <Button Grid.Row="9" Content="Create accounts"
                             HorizontalAlignment="Left" Padding="18,8" FontSize="14"
-                            Command="{Binding CreateAccountsCommand}"
-                            IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}" />
+                            Command="{Binding CreateAccountsCommand}" />
                 </Grid>
             </Border>
 

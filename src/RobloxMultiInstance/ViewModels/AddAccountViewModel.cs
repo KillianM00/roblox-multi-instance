@@ -38,18 +38,29 @@ public partial class AddAccountViewModel : ObservableObject
         }
         IsValidating = true;
         ValidateStatus = "Checking...";
-        var info = await App.RobloxAuth.GetUserInfoAsync(Cookie.Trim());
-        IsValidating = false;
-        if (info != null)
+        try
         {
-            ValidateStatus = $"OK — {info.Name} (ID {info.Id})";
-            IsValid = true;
-            if (string.IsNullOrWhiteSpace(Alias)) Alias = info.Name;
+            var info = await App.RobloxAuth.GetUserInfoAsync(Cookie.Trim());
+            if (info != null)
+            {
+                ValidateStatus = $"OK — {info.Name} (ID {info.Id})";
+                IsValid = true;
+                if (string.IsNullOrWhiteSpace(Alias)) Alias = info.Name;
+            }
+            else
+            {
+                ValidateStatus = "Invalid or expired cookie.";
+                IsValid = false;
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ValidateStatus = "Invalid or expired cookie.";
+            ValidateStatus = $"Validation error: {ex.Message}";
             IsValid = false;
+        }
+        finally
+        {
+            IsValidating = false;
         }
     }
 

@@ -109,7 +109,6 @@
                                 IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}" />
                         <Button Content="Cycle exit" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                 Command="{Binding CycleCommand}"
-                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"
                                 ToolTip="Disconnect, pick a different exit, reconnect. Use this between batches to reset Roblox's per-IP bucket." />
                         <Button Content="Disconnect" Style="{StaticResource DangerButton}" Margin="8,0,0,0"
                                 Command="{Binding DisconnectCommand}"

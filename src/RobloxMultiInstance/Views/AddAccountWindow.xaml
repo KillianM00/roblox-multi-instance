@@ -41,7 +41,7 @@
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,8">
             <Button Content="Validate" Style="{StaticResource SecondaryButton}"
-                    Command="{Binding ValidateCommand}" IsEnabled="{Binding IsValidating, Converter={StaticResource InverseBoolConverter}}" />
+                    Command="{Binding ValidateCommand}" />
             <TextBlock Text="{Binding ValidateStatus}" VerticalAlignment="Center"
                        Margin="12,0,0,0" Foreground="{StaticResource MutedTextBrush}" />
         </StackPanel>
