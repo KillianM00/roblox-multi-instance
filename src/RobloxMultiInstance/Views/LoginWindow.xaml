@@ -44,13 +44,22 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" x:Name="StatusText"
                            Text="Waiting for login..."
                            VerticalAlignment="Center"
-                           Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
-                <Button Grid.Column="1" Content="Cancel"
+                           Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                           TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1" Content="Capture Now"
                         Style="{StaticResource SecondaryButton}"
+                        Margin="8,0,0,0"
+                        Click="OnCaptureNowClick"
+                        ToolTip="Force-capture whatever .ROBLOSECURITY cookie is currently in the embedded browser's cookie jar, regardless of which page you're on." />
+                <Button Grid.Column="2" Content="Cancel"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="8,0,0,0"
                         Click="OnCancelClick" />
             </Grid>
         </Border>

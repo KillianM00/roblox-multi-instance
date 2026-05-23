@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 
@@ -95,7 +96,7 @@ public partial class LoginWindow : Window
         }
     }
 
-    private async Task TryCaptureCookieAsync()
+    private async Task TryCaptureCookieAsync(bool force = false)
     {
         if (_captured) return;
         if (Web?.CoreWebView2 == null) return;
@@ -103,45 +104,59 @@ public partial class LoginWindow : Window
         {
             var url = Web.CoreWebView2.Source ?? "";
 
-            // "We're logged in" heuristic: cookie exists AND we're off any of the
-            // pre-auth pages. This covers /home /discover /games /users /account
-            // /welcome /charts etc. without us having to enumerate them.
+            // Look in multiple cookie scopes — Roblox files .ROBLOSECURITY under
+            // different host scopes (.roblox.com vs www.roblox.com) depending on
+            // which page set it.
+            CoreWebView2Cookie? auth = null;
+            foreach (var scope in new[]
+                     {
+                         "https://www.roblox.com",
+                         "https://roblox.com",
+                         "https://www.roblox.com/home",
+                     })
+            {
+                var cookies = await Web.CoreWebView2.CookieManager.GetCookiesAsync(scope);
+                auth = cookies?.FirstOrDefault(c => c.Name == ".ROBLOSECURITY" && !string.IsNullOrEmpty(c.Value));
+                if (auth != null) break;
+            }
+
             bool onPreAuthPage =
                 url.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
                 url.Contains("/CreateAccount", StringComparison.OrdinalIgnoreCase) ||
                 url.Contains("/signin", StringComparison.OrdinalIgnoreCase) ||
                 url.Contains("/security-questions", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("/Account/Security", StringComparison.OrdinalIgnoreCase) ||
                 url.Contains("about:blank", StringComparison.OrdinalIgnoreCase);
 
-            var cookies = await Web.CoreWebView2.CookieManager.GetCookiesAsync("https://www.roblox.com");
-            var auth = cookies?.FirstOrDefault(c => c.Name == ".ROBLOSECURITY");
+            var cookieStatus = auth == null ? "no cookie" : $"cookie ({auth.Value.Length} chars)";
+            var shortUrl = url.Length > 70 ? url[..70] + "..." : url;
+            StatusText.Text = $"[{cookieStatus}] {shortUrl}";
 
-            if (auth == null || string.IsNullOrEmpty(auth.Value))
-            {
-                Dispatcher.BeginInvoke(new Action(() => StatusText.Text = "Waiting for login..."));
-                return;
-            }
+            if (auth == null) return;
 
-            if (onPreAuthPage)
-            {
-                Dispatcher.BeginInvoke(new Action(() =>
-                    StatusText.Text = "Cookie found — finish the form / sign-in to capture."));
-                return;
-            }
+            // Capture if (a) caller forced it via the Capture Now button, OR
+            // (b) we're off the pre-auth pages AND a cookie is present.
+            if (!force && onPreAuthPage) return;
 
             _captured = true;
             CapturedCookie = auth.Value;
             _pollTimer?.Stop();
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                StatusText.Text = "Captured. Closing...";
-                DialogResult = true;
-                Close();
-            }));
+            StatusText.Text = $"Captured ({auth.Value.Length} chars). Closing...";
+
+            try { DialogResult = true; } catch { }
+            try { Close(); } catch { }
         }
-        catch
+        catch (Exception ex)
         {
+            try { StatusText.Text = $"Poll exception: {ex.Message}"; } catch { }
+        }
+    }
+
+    private async void OnCaptureNowClick(object sender, RoutedEventArgs e)
+    {
+        await TryCaptureCookieAsync(force: true);
+        if (!_captured)
+        {
+            StatusText.Text = "No .ROBLOSECURITY cookie in the browser yet — sign in first.";
         }
     }
 
