@@ -7,115 +7,159 @@
         <vm:GenerateViewModel />
     </UserControl.DataContext>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Account Generator" FontSize="16" FontWeight="SemiBold" />
-            <TextBlock Text="Spin up new Roblox accounts in the embedded browser. Roblox enforces a CAPTCHA on signup so you solve it once per account, then the cookie is captured automatically."
-                       FontSize="11" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"
-                       TextWrapping="Wrap" />
-        </StackPanel>
-
-        <!-- Suggested username -->
-        <Border Grid.Row="1" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="14" Margin="0,0,0,10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="SUGGESTED USERNAME"
-                           FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                <Grid Grid.Row="1" Margin="0,6,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0" Text="{Binding SuggestedUsername, UpdateSourceTrigger=PropertyChanged}"
-                             FontSize="16" FontFamily="Consolas" />
-                    <Button Grid.Column="1" Content="Regenerate" Margin="8,0,0,0"
-                            Style="{StaticResource SecondaryButton}"
-                            Command="{Binding RegenUsernameCommand}" />
-                    <Button Grid.Column="2" Content="Copy" Margin="6,0,0,0"
-                            Command="{Binding CopyUsernameCommand}" />
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- Suggested password -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="14" Margin="0,0,0,10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="SUGGESTED PASSWORD"
-                           FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource MutedTextBrush}" />
-                <Grid Grid.Row="1" Margin="0,6,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0" Text="{Binding SuggestedPassword, UpdateSourceTrigger=PropertyChanged}"
-                             FontSize="16" FontFamily="Consolas" />
-                    <Button Grid.Column="1" Content="Regenerate" Margin="8,0,0,0"
-                            Style="{StaticResource SecondaryButton}"
-                            Command="{Binding RegenPasswordCommand}" />
-                    <Button Grid.Column="2" Content="Copy" Margin="6,0,0,0"
-                            Command="{Binding CopyPasswordCommand}" />
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- Open signup -->
-        <Border Grid.Row="3" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="14" Margin="0,0,0,10">
-            <StackPanel>
-                <TextBlock Text="OPEN SIGNUP" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,6" />
-                <TextBlock Text="Launches an embedded browser at https://www.roblox.com/CreateAccount. Paste the username/password if you want, fill in birthday, solve the CAPTCHA. When Roblox lands you on the home page, the new account is auto-added with avatar + user ID."
-                           Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,10" />
-                <Button Content="Open Signup Browser" HorizontalAlignment="Left"
-                        Padding="14,7"
-                        Command="{Binding OpenSignupCommand}" />
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Account Generator" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="Enter the username and password you want to use, optionally tweak the birthday, then pick how many accounts to create. Each iteration opens the Roblox signup page with the form pre-filled; you solve the CAPTCHA and click Sign Up."
+                           FontSize="11" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0"
+                           TextWrapping="Wrap" />
             </StackPanel>
-        </Border>
 
-        <!-- Status -->
-        <Border Grid.Row="4" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="14" VerticalAlignment="Top">
-            <StackPanel>
-                <TextBlock Text="STATUS / TIPS" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,6" />
-                <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap"
-                           Foreground="{StaticResource TextBrush}" FontSize="12" />
-                <TextBlock Margin="0,12,0,0" TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedTextBrush}" FontSize="11"
-                           Text="• Roblox flags rapid signups from one IP. Switch your VPN exit on the Network tab between signups." />
-                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedTextBrush}" FontSize="11"
-                           Text="• Each new account needs a unique birthday/email to avoid pattern detection. Roblox doesn't strictly require email but lots of features are gated behind it." />
-                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedTextBrush}" FontSize="11"
-                           Text="• Cookies for fresh accounts may rotate aggressively in the first hour — the validity monitor will pick that up." />
-            </StackPanel>
-        </Border>
-    </Grid>
+            <!-- Form card -->
+            <Border Grid.Row="1" Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="18" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Username -->
+                    <TextBlock Grid.Row="0" Text="USERNAME" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <Grid Grid.Row="1" Margin="0,6,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                                 FontSize="14" FontFamily="Consolas" />
+                        <Button Grid.Column="1" Content="Randomize" Margin="8,0,0,0"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding RegenUsernameCommand}" />
+                        <Button Grid.Column="2" Content="Copy" Margin="6,0,0,0"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CopyUsernameCommand}" />
+                    </Grid>
+
+                    <!-- Password -->
+                    <TextBlock Grid.Row="2" Text="PASSWORD (min 8 chars)" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <Grid Grid.Row="3" Margin="0,6,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                                 FontSize="14" FontFamily="Consolas" />
+                        <Button Grid.Column="1" Content="Randomize" Margin="8,0,0,0"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding RegenPasswordCommand}" />
+                        <Button Grid.Column="2" Content="Copy" Margin="6,0,0,0"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CopyPasswordCommand}" />
+                    </Grid>
+
+                    <!-- Birthday -->
+                    <TextBlock Grid.Row="4" Text="BIRTHDAY (Roblox requires 13+)" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <Grid Grid.Row="5" Margin="0,6,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="Month" FontSize="10" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,3" />
+                            <ComboBox ItemsSource="{Binding Months}" SelectedItem="{Binding BirthMonth}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{StaticResource TextBrush}"
+                                      BorderBrush="{StaticResource BorderBrush}" Padding="8,6" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="3,0">
+                            <TextBlock Text="Day" FontSize="10" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,3" />
+                            <ComboBox ItemsSource="{Binding Days}" SelectedItem="{Binding BirthDay}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{StaticResource TextBrush}"
+                                      BorderBrush="{StaticResource BorderBrush}" Padding="8,6" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="6,0,0,0">
+                            <TextBlock Text="Year" FontSize="10" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,3" />
+                            <ComboBox ItemsSource="{Binding Years}" SelectedItem="{Binding BirthYear}"
+                                      Background="{StaticResource PanelAltBrush}"
+                                      Foreground="{StaticResource TextBrush}"
+                                      BorderBrush="{StaticResource BorderBrush}" Padding="8,6" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Count -->
+                    <TextBlock Grid.Row="6" Text="NUMBER OF ACCOUNTS" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <Grid Grid.Row="7" Margin="0,6,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}"
+                                 FontSize="14" HorizontalContentAlignment="Center" />
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                                   Text="When &gt; 1 and the random checkbox is off, the username gets _1, _2, ... appended. Cap is 20." />
+                    </Grid>
+
+                    <!-- Random per account checkbox -->
+                    <CheckBox Grid.Row="8" IsChecked="{Binding RandomUsernamePerAccount}" Margin="0,0,0,18"
+                              Foreground="{StaticResource TextBrush}"
+                              Content="Use a fresh random username for each account (ignores the username field above)" />
+
+                    <!-- Create button -->
+                    <Button Grid.Row="9" Content="Create accounts"
+                            HorizontalAlignment="Left" Padding="18,8" FontSize="14"
+                            Command="{Binding CreateAccountsCommand}"
+                            IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBoolConverter}}" />
+                </Grid>
+            </Border>
+
+            <!-- Status -->
+            <Border Grid.Row="2" Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="14">
+                <StackPanel>
+                    <TextBlock Text="STATUS" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextBrush}" FontSize="12" />
+                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                               Text="• Roblox flags rapid signups from the same IP. Cycle your VPN exit on the Network tab between accounts if you're creating more than 2-3 in a row." />
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                               Text="• Pre-fill targets common field IDs on Roblox's signup page. If a field doesn't auto-populate, the layout has changed; just type it in manually — the cookie will still be captured." />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </UserControl>
