@@ -17,6 +17,7 @@
             <conv:TabSelectedToBrushConverter x:Key="TabSelectedToBrushConverter" />
             <conv:TabSelectedToForegroundConverter x:Key="TabSelectedToForegroundConverter" />
             <conv:TabVisibilityConverter x:Key="TabVisibilityConverter" />
+            <conv:StringPresentToVisibilityConverter x:Key="StringPresentToVisibilityConverter" />
 
             <Color x:Key="BgColor">#FF1E1E22</Color>
             <Color x:Key="PanelColor">#FF2A2A2F</Color>

@@ -1,8 +1,12 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxMultiInstance", "src\RobloxMultiInstance\RobloxMultiInstance.csproj", "{8B5C5A1D-7A1F-4E1B-9D9A-1F2E3D4C5B6A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A6385D45-6588-470C-90CF-257B7A7174E7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RobloxMultiInstance.Tests", "tests\RobloxMultiInstance.Tests\RobloxMultiInstance.Tests.csproj", "{0FBAAC75-6441-4347-826C-2C071CDBE496}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,8 +18,15 @@ Global
 		{8B5C5A1D-7A1F-4E1B-9D9A-1F2E3D4C5B6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B5C5A1D-7A1F-4E1B-9D9A-1F2E3D4C5B6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B5C5A1D-7A1F-4E1B-9D9A-1F2E3D4C5B6A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FBAAC75-6441-4347-826C-2C071CDBE496}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FBAAC75-6441-4347-826C-2C071CDBE496}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FBAAC75-6441-4347-826C-2C071CDBE496}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FBAAC75-6441-4347-826C-2C071CDBE496}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0FBAAC75-6441-4347-826C-2C071CDBE496} = {A6385D45-6588-470C-90CF-257B7A7174E7}
 	EndGlobalSection
 EndGlobal

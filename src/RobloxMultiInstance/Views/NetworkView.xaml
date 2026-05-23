@@ -1,0 +1,197 @@
+<UserControl x:Class="RobloxMultiInstance.Views.NetworkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:RobloxMultiInstance.ViewModels"
+             xmlns:net="clr-namespace:RobloxMultiInstance.Services.Network">
+
+    <UserControl.DataContext>
+        <vm:NetworkViewModel />
+    </UserControl.DataContext>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Network" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="One-click VPN cycling to reset the per-IP rate-limit bucket between launches."
+                           FontSize="11" Foreground="{StaticResource MutedTextBrush}" Margin="0,2,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="Re-detect"
+                    Style="{StaticResource SecondaryButton}"
+                    Command="{Binding RedetectCommand}" />
+        </Grid>
+
+        <!-- Current state card -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="CURRENT PUBLIC IP" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Text="{Binding PublicIp, FallbackValue='(checking...)'}"
+                           FontSize="28" FontWeight="SemiBold" FontFamily="Consolas" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,4,0,0"
+                           Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                           Text="{Binding PreviousPublicIp, StringFormat='Previous: {0}'}"
+                           Visibility="{Binding PreviousPublicIp, Converter={StaticResource StringPresentToVisibilityConverter}}" />
+
+                <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="1"
+                            VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Border CornerRadius="10" Padding="10,3" HorizontalAlignment="Right"
+                            Background="{Binding IsConnected, Converter={StaticResource BoolToBrushConverter}}">
+                        <TextBlock Foreground="White" FontWeight="SemiBold" FontSize="11"
+                                   Text="{Binding IsConnected, Converter={StaticResource BoolToMutexTextConverter}, ConverterParameter=VPN}" />
+                    </Border>
+                    <TextBlock Text="{Binding StatusText}" Margin="0,6,0,0"
+                               TextAlignment="Right" FontSize="11"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               MaxWidth="300" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Provider section (detected or install suggestions) -->
+        <Grid Grid.Row="2">
+            <!-- When at least one provider detected -->
+            <Border Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16"
+                    Visibility="{Binding AnyDetected, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="DETECTED VPN PROVIDERS" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8" />
+
+                    <ComboBox Grid.Row="1" ItemsSource="{Binding DetectedProviders}"
+                              SelectedItem="{Binding SelectedProvider}"
+                              Background="{StaticResource PanelAltBrush}"
+                              Foreground="{StaticResource TextBrush}"
+                              BorderBrush="{StaticResource BorderBrush}"
+                              Padding="8,6" MinWidth="280" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type net:IVpnProvider}">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,8">
+                        <Button Content="Connect" Command="{Binding ConnectCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}" />
+                        <Button Content="Cycle exit" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                Command="{Binding CycleCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}"
+                                ToolTip="Disconnect, pick a different exit, reconnect. Use this between batches to reset Roblox's per-IP bucket." />
+                        <Button Content="Disconnect" Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                                Command="{Binding DisconnectCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}" />
+                        <Button Content="Refresh status" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                Command="{Binding RefreshCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="LOCATION (optional — used by Connect)"
+                                   FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,6" />
+                        <ListBox Grid.Row="1" ItemsSource="{Binding Locations}"
+                                 SelectedItem="{Binding SelectedLocation}"
+                                 Background="{StaticResource PanelAltBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource TextBrush}"
+                                 MaxHeight="220">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type net:VpnLocation}">
+                                    <TextBlock Text="{Binding Display}" Padding="4,2" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- When nothing detected -->
+            <Border Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="20"
+                    Visibility="{Binding AnyDetected, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="No VPN detected on this machine"
+                               FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <TextBlock Text="Install one of these to enable one-click IP cycling between launch batches. Each fresh exit gives you a clean per-IP rate-limit bucket on Roblox's edge."
+                               TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,12" />
+
+                    <ItemsControl ItemsSource="{Binding InstallSuggestions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type net:IVpnProvider}">
+                                <Border Background="{StaticResource PanelAltBrush}"
+                                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                        CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="Open download page"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Padding="8,3"
+                                                Command="{Binding DataContext.OpenDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Cloudflare WARP is the friction-free recommendation: free, no signup, and 'warp-cli connect/disconnect' just works."
+                               TextWrapping="Wrap" FontSize="11"
+                               Foreground="{StaticResource MutedTextBrush}" Margin="0,12,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Bottom helper -->
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                CornerRadius="4" Padding="10,5" Margin="0,12,0,0">
+            <TextBlock Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                       Text="Tip: launch ~4 accounts → hit 'Cycle exit' → launch ~4 more. Each cycle gives Roblox a fresh source IP." />
+        </Border>
+    </Grid>
+</UserControl>

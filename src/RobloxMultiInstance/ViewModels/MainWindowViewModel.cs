@@ -18,4 +18,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private void GoToInstances() => CurrentTab = "Instances";
+
+    [RelayCommand]
+    private void GoToNetwork() => CurrentTab = "Network";
 }

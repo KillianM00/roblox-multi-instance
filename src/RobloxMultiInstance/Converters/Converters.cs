@@ -21,7 +21,17 @@ public class BoolToBrushConverter : IValueConverter
 public class BoolToMutexTextConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object? parameter, CultureInfo culture)
-        => (value is bool x && x) ? "MUTEX ACTIVE" : "MUTEX INACTIVE";
+    {
+        var label = parameter?.ToString() ?? "MUTEX";
+        return (value is bool x && x) ? $"{label} ACTIVE" : $"{label} INACTIVE";
+    }
+    public object ConvertBack(object value, Type t, object? p, CultureInfo c) => throw new NotImplementedException();
+}
+
+public class StringPresentToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object? parameter, CultureInfo culture)
+        => !string.IsNullOrWhiteSpace(value as string) ? Visibility.Visible : Visibility.Collapsed;
     public object ConvertBack(object value, Type t, object? p, CultureInfo c) => throw new NotImplementedException();
 }
 
