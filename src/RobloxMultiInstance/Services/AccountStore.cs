@@ -25,6 +25,15 @@ public class AccountStore
     private int _batchDepth;
     private bool _pendingSave;
 
+    /// <summary>Fired on Upsert/Remove so listeners (the Accounts tab VM in particular)
+    /// can refresh their projection regardless of which screen modified the store.</summary>
+    public event Action? Changed;
+
+    private void RaiseChanged()
+    {
+        try { Changed?.Invoke(); } catch { }
+    }
+
     public IReadOnlyList<Account> Accounts
     {
         get { lock (_lock) return _accounts.ToList(); }
@@ -108,12 +117,14 @@ public class AccountStore
             else _accounts.Add(account);
         }
         Save();
+        RaiseChanged();
     }
 
     public void Remove(Guid id)
     {
         lock (_lock) _accounts.RemoveAll(a => a.Id == id);
         Save();
+        RaiseChanged();
     }
 
     public Account? Find(Guid id)

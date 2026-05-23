@@ -20,6 +20,15 @@ public partial class AccountsViewModel : ObservableObject
     {
         ReloadAccounts();
         App.ValidityMonitor.ValidityChanged += OnValidityChanged;
+        App.AccountStore.Changed += OnStoreChanged;
+    }
+
+    private void OnStoreChanged()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null) return;
+        if (dispatcher.CheckAccess()) ReloadAccounts();
+        else dispatcher.BeginInvoke(new Action(ReloadAccounts));
     }
 
     private void OnValidityChanged(Guid accountId, bool valid)

@@ -21,6 +21,7 @@ public partial class LoginWindow : Window
     private bool _captured;
     private bool _prefillApplied;
     private string? _profileFolder;
+    private System.Windows.Threading.DispatcherTimer? _pollTimer;
 
     public LoginWindow()
     {
@@ -45,6 +46,15 @@ public partial class LoginWindow : Window
             SubHeadingText.Text = SubHeading;
             Web.CoreWebView2.Navigate(StartUrl);
             LoadingOverlay.Visibility = Visibility.Collapsed;
+
+            // Fallback: poll for a captured cookie every 1.5s, in case a NavigationCompleted
+            // never fires for the final state (XHR-driven post-signup flows do this).
+            _pollTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1500),
+            };
+            _pollTimer.Tick += async (_, _) => await TryCaptureCookieAsync();
+            _pollTimer.Start();
         }
         catch (Exception ex)
         {
@@ -68,7 +78,7 @@ public partial class LoginWindow : Window
         try
         {
             var url = Web.CoreWebView2.Source ?? "";
-            Dispatcher.BeginInvoke(new Action(() => StatusText.Text = $"Checking session..."));
+            Dispatcher.BeginInvoke(new Action(() => StatusText.Text = "Checking session..."));
 
             // Auto-fill the signup form once when we land on /CreateAccount.
             if (!_prefillApplied && HasPrefill() &&
@@ -78,33 +88,57 @@ public partial class LoginWindow : Window
                 try { await Web.CoreWebView2.ExecuteScriptAsync(BuildPrefillScript()); } catch { }
             }
 
-            // If we landed somewhere that means we're logged in
-            bool likelyLoggedIn =
-                url.Contains("roblox.com/home", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("roblox.com/discover", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("roblox.com/games", StringComparison.OrdinalIgnoreCase) ||
-                url.Contains("roblox.com/users/", StringComparison.OrdinalIgnoreCase);
+            await TryCaptureCookieAsync();
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task TryCaptureCookieAsync()
+    {
+        if (_captured) return;
+        if (Web?.CoreWebView2 == null) return;
+        try
+        {
+            var url = Web.CoreWebView2.Source ?? "";
+
+            // "We're logged in" heuristic: cookie exists AND we're off any of the
+            // pre-auth pages. This covers /home /discover /games /users /account
+            // /welcome /charts etc. without us having to enumerate them.
+            bool onPreAuthPage =
+                url.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("/CreateAccount", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("/signin", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("/security-questions", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("/Account/Security", StringComparison.OrdinalIgnoreCase) ||
+                url.Contains("about:blank", StringComparison.OrdinalIgnoreCase);
 
             var cookies = await Web.CoreWebView2.CookieManager.GetCookiesAsync("https://www.roblox.com");
             var auth = cookies?.FirstOrDefault(c => c.Name == ".ROBLOSECURITY");
 
-            if (auth != null && !string.IsNullOrEmpty(auth.Value) && likelyLoggedIn)
-            {
-                _captured = true;
-                CapturedCookie = auth.Value;
-                Dispatcher.BeginInvoke(new Action(() => StatusText.Text = "Captured. Closing..."));
-                DialogResult = true;
-                Close();
-            }
-            else if (auth != null && !string.IsNullOrEmpty(auth.Value))
-            {
-                Dispatcher.BeginInvoke(new Action(() =>
-                    StatusText.Text = "Cookie found — navigate to /home or any post-login page to confirm."));
-            }
-            else
+            if (auth == null || string.IsNullOrEmpty(auth.Value))
             {
                 Dispatcher.BeginInvoke(new Action(() => StatusText.Text = "Waiting for login..."));
+                return;
             }
+
+            if (onPreAuthPage)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                    StatusText.Text = "Cookie found — finish the form / sign-in to capture."));
+                return;
+            }
+
+            _captured = true;
+            CapturedCookie = auth.Value;
+            _pollTimer?.Stop();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                StatusText.Text = "Captured. Closing...";
+                DialogResult = true;
+                Close();
+            }));
         }
         catch
         {
@@ -160,6 +194,7 @@ public partial class LoginWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        try { _pollTimer?.Stop(); } catch { }
         try { Web?.Dispose(); } catch { }
         if (_profileFolder != null)
         {
