@@ -105,6 +105,30 @@ public class RobloxAuth
         return null;
     }
 
+    /// <summary>Fetch a CSRF token by probing the auth-ticket endpoint, which always
+    /// returns one on 403. Caches the result.</summary>
+    private async Task<string?> EnsureCsrfAsync(string cookie, CancellationToken ct)
+    {
+        var cached = GetCachedCsrf(cookie);
+        if (cached != null) return cached;
+
+        using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
+        DecorateAuthed(probe);
+        probe.Headers.Referrer = new Uri(Referer);
+        probe.Content = new StringContent("");
+        using var resp = await AuthedClient.SendAsync(probe, ct);
+        if (resp.Headers.TryGetValues("x-csrf-token", out var v))
+        {
+            var token = v.FirstOrDefault();
+            if (!string.IsNullOrEmpty(token))
+            {
+                CacheCsrf(cookie, token);
+                return token;
+            }
+        }
+        return null;
+    }
+
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
     {
         using var req = AuthedRequest(HttpMethod.Get, AuthenticatedUserUrl, cookie);
@@ -131,48 +155,43 @@ public class RobloxAuth
         if (string.IsNullOrWhiteSpace(linkId)) return new ShareLinkResult(null, "Empty link id.");
         var payload = JsonSerializer.Serialize(new { linkId, linkType });
 
-        string? csrf = null;
-        string? lastBody = null;
-        int lastStatus = 0;
-        using (var probe = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie))
+        // apis.roblox.com returns 401 (not 403) for the share-link endpoint when the
+        // request has no X-CSRF-TOKEN, even with a valid cookie. So fetch a CSRF up
+        // front from the auth-ticket endpoint (which always returns one) and attach it
+        // on the first call instead of relying on the probe/retry pattern.
+        var csrf = await EnsureCsrfAsync(cookie, ct);
+        if (csrf == null) return new ShareLinkResult(null, "Couldn't obtain a CSRF token (cookie may be invalid).");
+
+        ShareLinkResult result = await TryCallAsync(csrf);
+        // If the cached CSRF was stale, retry once with a fresh one.
+        if (result.Data == null && result.Error != null && result.Error.Contains("HTTP 403"))
         {
-            DecorateAuthed(probe);
-            probe.Headers.Referrer = new Uri(Referer);
-            probe.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var probeResp = await AuthedClient.SendAsync(probe, ct);
-            lastStatus = (int)probeResp.StatusCode;
-            if (probeResp.IsSuccessStatusCode)
+            CsrfCache.TryRemove(CookieKey(cookie), out _);
+            var fresh = await EnsureCsrfAsync(cookie, ct);
+            if (fresh != null && fresh != csrf)
+                result = await TryCallAsync(fresh);
+        }
+        return result;
+
+        async Task<ShareLinkResult> TryCallAsync(string csrfToken)
+        {
+            using var req = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie);
+            DecorateAuthed(req);
+            req.Headers.Referrer = new Uri(Referer);
+            req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrfToken);
+            req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+            using var resp = await AuthedClient.SendAsync(req, ct);
+            if (resp.IsSuccessStatusCode)
             {
-                var jsonOk = await probeResp.Content.ReadAsStringAsync(ct);
-                var parsed = ParseShareResolution(jsonOk, linkType);
+                var ok = await resp.Content.ReadAsStringAsync(ct);
+                var parsed = ParseShareResolution(ok, linkType);
                 return parsed != null
                     ? new ShareLinkResult(parsed, null)
-                    : new ShareLinkResult(null, $"Resolved but couldn't parse response body. Raw: {Truncate(jsonOk, 240)}");
+                    : new ShareLinkResult(null, $"Resolved but couldn't parse response. Raw: {Truncate(ok, 240)}");
             }
-            lastBody = await probeResp.Content.ReadAsStringAsync(ct);
-            if (probeResp.Headers.TryGetValues("x-csrf-token", out var v))
-                csrf = v.FirstOrDefault();
-        }
-
-        if (string.IsNullOrEmpty(csrf))
-            return new ShareLinkResult(null, $"HTTP {lastStatus} with no CSRF token. Body: {Truncate(lastBody, 240)}");
-
-        using var req = AuthedRequest(HttpMethod.Post, ResolveShareLinkUrl, cookie);
-        DecorateAuthed(req);
-        req.Headers.Referrer = new Uri(Referer);
-        req.Headers.TryAddWithoutValidation("X-CSRF-TOKEN", csrf);
-        req.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-        using var resp = await AuthedClient.SendAsync(req, ct);
-        if (!resp.IsSuccessStatusCode)
-        {
             var errBody = await resp.Content.ReadAsStringAsync(ct);
             return new ShareLinkResult(null, $"HTTP {(int)resp.StatusCode}: {Truncate(errBody, 240)}");
         }
-        var json = await resp.Content.ReadAsStringAsync(ct);
-        var resolved = ParseShareResolution(json, linkType);
-        return resolved != null
-            ? new ShareLinkResult(resolved, null)
-            : new ShareLinkResult(null, $"Resolved but couldn't parse response. Raw: {Truncate(json, 240)}");
     }
 
     private static string Truncate(string? s, int n)
