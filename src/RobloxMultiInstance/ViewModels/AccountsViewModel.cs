@@ -173,16 +173,30 @@ public partial class AccountsViewModel : ObservableObject
                 cookies.Add(a.Model.Cookie);
 
             string? lastErr = null;
+            bool sawCookieValid = false;
             foreach (var c in cookies)
             {
                 var result = await App.RobloxAuth.ResolveShareLinkAsync(c, code, type);
                 if (result.Data != null)
                     return (result.Data.PlaceId, result.Data.PrivateServerLinkCode, null);
                 lastErr = result.Error;
+
+                // If the share-link endpoint rejects us, check whether the cookie
+                // itself is even valid via /users/authenticated. Lets us distinguish
+                // "bad cookie" from "endpoint blocks us specifically".
+                if (!sawCookieValid && (lastErr?.Contains("401") ?? false))
+                {
+                    var info = await App.RobloxAuth.GetUserInfoAsync(c);
+                    if (info != null) sawCookieValid = true;
+                }
             }
 
+            var diagnosis = sawCookieValid
+                ? "At least one cookie is valid for general auth, but apis.roblox.com is rejecting the Server-link resolution specifically. This endpoint enforces extra checks (TLS fingerprint / device token) that block non-browser clients. Workaround: open the share URL in your browser, copy the redirected /games/.../?privateServerLinkCode=... URL from the address bar, paste THAT in the Game field instead."
+                : "None of the selected accounts' cookies authenticated successfully — they may all be expired or rate-limited.";
+
             MessageBox.Show(
-                $"Couldn't resolve the share link (type={type}).\n\nLast error: {lastErr ?? "(no details)"}\n\nPossible causes: link expired/revoked, the resolving account lacks access (private servers need an invite), or the IP is rate-limited.",
+                $"Couldn't resolve the share link (type={type}).\n\nLast error: {lastErr ?? "(no details)"}\n\n{diagnosis}",
                 "Share link resolution failed",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return null;
