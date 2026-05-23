@@ -105,28 +105,59 @@ public class RobloxAuth
         return null;
     }
 
-    /// <summary>Fetch a CSRF token by probing the auth-ticket endpoint, which always
-    /// returns one on 403. Caches the result.</summary>
-    private async Task<string?> EnsureCsrfAsync(string cookie, CancellationToken ct)
+    // CSRF probes — different subdomains have independent per-IP rate-limit buckets.
+    // If one is rate-limited (HTTP 429), the next one usually still issues a token.
+    private static readonly (string Name, string Url)[] CsrfProbeEndpoints =
+    {
+        ("auth-ticket",      "https://auth.roblox.com/v1/authentication-ticket/"),
+        ("logout",           "https://auth.roblox.com/v2/logout"),
+        ("friends",          "https://friends.roblox.com/v1/users/1/request-friendship"),
+        ("accountsettings",  "https://accountsettings.roblox.com/v1/email"),
+        ("presence",         "https://presence.roblox.com/v1/presence/users"),
+    };
+
+    private async Task<(string? Token, string? Error)> EnsureCsrfWithErrorAsync(string cookie, CancellationToken ct)
     {
         var cached = GetCachedCsrf(cookie);
-        if (cached != null) return cached;
+        if (cached != null) return (cached, null);
 
-        using var probe = AuthedRequest(HttpMethod.Post, AuthTicketUrl, cookie);
-        DecorateAuthed(probe);
-        probe.Headers.Referrer = new Uri(Referer);
-        probe.Content = new StringContent("");
-        using var resp = await AuthedClient.SendAsync(probe, ct);
-        if (resp.Headers.TryGetValues("x-csrf-token", out var v))
+        var errors = new List<string>();
+        foreach (var (name, url) in CsrfProbeEndpoints)
         {
-            var token = v.FirstOrDefault();
-            if (!string.IsNullOrEmpty(token))
+            try
             {
-                CacheCsrf(cookie, token);
-                return token;
+                using var probe = AuthedRequest(HttpMethod.Post, url, cookie);
+                DecorateAuthed(probe);
+                probe.Headers.Referrer = new Uri(Referer);
+                probe.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+                using var resp = await AuthedClient.SendAsync(probe, ct);
+
+                if (resp.Headers.TryGetValues("x-csrf-token", out var v))
+                {
+                    var token = v.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        CacheCsrf(cookie, token);
+                        return (token, null);
+                    }
+                }
+
+                var status = (int)resp.StatusCode;
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                errors.Add($"{name}={status} ({Truncate(body, 80)})");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{name}=exc ({ex.Message})");
             }
         }
-        return null;
+        return (null, $"All CSRF probes failed: {string.Join(" | ", errors)}");
+    }
+
+    private async Task<string?> EnsureCsrfAsync(string cookie, CancellationToken ct)
+    {
+        var (token, _) = await EnsureCsrfWithErrorAsync(cookie, ct);
+        return token;
     }
 
     public async Task<UserInfo?> GetUserInfoAsync(string cookie, CancellationToken ct = default)
@@ -157,10 +188,9 @@ public class RobloxAuth
 
         // apis.roblox.com returns 401 (not 403) for the share-link endpoint when the
         // request has no X-CSRF-TOKEN, even with a valid cookie. So fetch a CSRF up
-        // front from the auth-ticket endpoint (which always returns one) and attach it
-        // on the first call instead of relying on the probe/retry pattern.
-        var csrf = await EnsureCsrfAsync(cookie, ct);
-        if (csrf == null) return new ShareLinkResult(null, "Couldn't obtain a CSRF token (cookie may be invalid).");
+        // front from any endpoint that issues one, then attach it on the first call.
+        var (csrf, csrfErr) = await EnsureCsrfWithErrorAsync(cookie, ct);
+        if (csrf == null) return new ShareLinkResult(null, csrfErr ?? "Couldn't obtain a CSRF token (cookie may be invalid).");
 
         ShareLinkResult result = await TryCallAsync(csrf);
         // If the cached CSRF was stale, retry once with a fresh one.
