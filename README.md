@@ -1,5 +1,7 @@
 # Multi Roblox Manager
 
+[![Tests](https://github.com/KillianM00/roblox-multi-instance/actions/workflows/test.yml/badge.svg)](https://github.com/KillianM00/roblox-multi-instance/actions/workflows/test.yml)
+
 A Windows desktop app to run multiple Roblox accounts side-by-side in separate Roblox processes. Built with .NET 8 + WPF.
 
 ## Features
