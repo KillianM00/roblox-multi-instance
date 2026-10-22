@@ -84,7 +84,7 @@ Play mode moves the selected Roblox window over the app's play area via `SetWind
 ## Security notes
 
 - Cookie storage is encrypted at rest, but the cookie is loaded into memory while the app runs. Don't run this on shared / untrusted machines.
-- The app does not exfiltrate cookies — it only talks to `auth.roblox.com` and `users.roblox.com`. Audit `src/RobloxMultiInstance/Services/RobloxAuth.cs` to confirm.
+- The authentication service communicates with several Roblox services for authentication, account details, avatars, presence, friend requests, and share-link resolution. Review [`RobloxAuth.cs`](src/RobloxMultiInstance/Services/RobloxAuth.cs) for the current endpoints and credential handling; the app is not limited to two hosts.
 - This is a third-party tool, not affiliated with or endorsed by Roblox Corporation.
 
 ## Project layout
